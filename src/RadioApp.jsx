@@ -4,7 +4,8 @@ import CardPlayer from './components/CardPlayer';
 
 const BASE_URL = "http://uk2freenew.listen2myradio.com:10718";
 const STREAM_URL = `${BASE_URL}/;`;
-const PROXY_URL = "https://api.cors.lol/?url=";
+// Using a reliable HTTPS proxy for metadata to avoid "Mixed Content" errors on Vercel
+const PROXY_URL = "https://api.allorigins.win/raw?url=";
 const STATS_URL = `${BASE_URL}/stats?sid=1&json=1`;
 
 function RadioApp() {
@@ -55,11 +56,13 @@ function RadioApp() {
     fetchCover();
   }, [metadata.artist, metadata.title]);
 
-  // JSONP Metadata polling
+  // Metadata polling
   useEffect(() => {
-    const fetchMetadata = () => {
-      // Define global callback if it doesn't exist
-      window.shoutcastCallback = (data) => {
+    const fetchMetadata = async () => {
+      try {
+        const response = await fetch(`${PROXY_URL}${encodeURIComponent(STATS_URL + "&t=" + Date.now())}`);
+        const data = await response.json();
+
         if (data && data.songtitle) {
           const parts = data.songtitle.split(' - ');
           let artist = parts.length >= 2 ? parts[0].trim() : "La Espárrago Rock";
@@ -80,24 +83,14 @@ function RadioApp() {
             setMetadata({ artist, title });
           }
         }
-        // Cleanup script tag after execution
-        const script = document.getElementById('shoutcast-jsonp');
-        if (script) script.remove();
-      };
-
-      // Create and inject script
-      const script = document.createElement('script');
-      script.id = 'shoutcast-jsonp';
-      script.src = `${STATS_URL}&callback=shoutcastCallback&t=${Date.now()}`;
-      document.body.appendChild(script);
+      } catch (e) {
+        console.error("Metadata fetch error:", e);
+      }
     };
 
     fetchMetadata();
-    const interval = setInterval(fetchMetadata, 8000); // 8s for snappier updates
-    return () => {
-      clearInterval(interval);
-      delete window.shoutcastCallback;
-    };
+    const interval = setInterval(fetchMetadata, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   // Audio Initialization & Global Listeners
