@@ -96,7 +96,6 @@ function RadioApp() {
   // Audio Initialization & Global Listeners
   useEffect(() => {
     const audio = audioRef.current;
-    audio.crossOrigin = "anonymous"; // Server supports it (Access-Control-Allow-Origin: *)
 
     // Squelch noisy logs, only log true failures
     const handleError = (e) => {
