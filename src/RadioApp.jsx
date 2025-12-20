@@ -3,7 +3,7 @@ import { Sun, Moon } from 'lucide-react';
 import CardPlayer from './components/CardPlayer';
 
 const BASE_URL = "http://uk2freenew.listen2myradio.com:10718";
-const STREAM_URL = `${BASE_URL}/;`;
+const STREAM_URL = "/radio-stream";
 // Using a reliable HTTPS proxy for metadata to avoid "Mixed Content" errors on Vercel
 const PROXY_URL = "https://api.allorigins.win/raw?url=";
 const STATS_URL = `${BASE_URL}/stats?sid=1&json=1`;
