@@ -125,33 +125,70 @@ function RadioApp() {
   useEffect(() => {
     const audio = audioRef.current;
     let watchdogTimer = null;
+    let lastTime = -1;
+    let progressInterval = null;
 
-    const startWatchdog = () => {
-      if (watchdogTimer) clearTimeout(watchdogTimer);
+    const clearWatchdog = () => {
+      if (watchdogTimer) {
+        clearTimeout(watchdogTimer);
+        watchdogTimer = null;
+      }
+    };
+
+    const startWatchdog = (reason = "Stall") => {
+      if (watchdogTimer) return;
       if (isPlaying && isOnline) {
+        console.log(`⏱️ Radio: Recuperando por ${reason}...`);
         watchdogTimer = setTimeout(() => {
           audio.src = `${STREAM_URL}?t=${Date.now()}`;
           audio.play().catch(() => { });
+          watchdogTimer = null;
+          lastTime = -1;
         }, 12000);
       }
     };
 
     const handlePlaying = () => {
-      if (watchdogTimer) clearTimeout(watchdogTimer);
+      clearWatchdog();
       setIsStalled(false);
     };
 
+    const handleWaitStall = () => {
+      setIsStalled(true);
+      startWatchdog("Conexión");
+    };
+
+    const handleError = () => {
+      if (audio.error?.code !== 4) {
+        handleWaitStall();
+      }
+    };
+
+    // Monitor playback progress to detect silent freezes
+    progressInterval = setInterval(() => {
+      if (isPlaying && isOnline && !isStalled) {
+        if (audio.currentTime === lastTime && !audio.paused) {
+          startWatchdog("Silencio");
+        }
+        lastTime = audio.currentTime;
+      }
+    }, 10000);
+
     audio.addEventListener('playing', handlePlaying);
-    audio.addEventListener('waiting', () => { setIsStalled(true); startWatchdog(); });
-    audio.addEventListener('stalled', () => { setIsStalled(true); startWatchdog(); });
-    audio.addEventListener('error', () => { if (audio.error?.code !== 4) startWatchdog(); });
+    audio.addEventListener('waiting', handleWaitStall);
+    audio.addEventListener('stalled', handleWaitStall);
+    audio.addEventListener('error', handleError);
 
     return () => {
       audio.removeEventListener('playing', handlePlaying);
-      if (watchdogTimer) clearTimeout(watchdogTimer);
+      audio.removeEventListener('waiting', handleWaitStall);
+      audio.removeEventListener('stalled', handleWaitStall);
+      audio.removeEventListener('error', handleError);
+      clearWatchdog();
+      if (progressInterval) clearInterval(progressInterval);
       audio.pause();
     };
-  }, [isPlaying, isOnline]);
+  }, [isPlaying, isOnline, isStalled]);
 
   // Playback Control
   useEffect(() => {
@@ -160,7 +197,12 @@ function RadioApp() {
       if (!audio.src || !audio.src.includes(STREAM_URL)) {
         audio.src = `${STREAM_URL}?t=${Date.now()}`;
       }
-      audio.play().catch(() => setIsPlaying(false));
+      audio.play().catch(err => {
+        if (err.name !== 'AbortError') {
+          console.error("Playback Error:", err);
+          setIsPlaying(false);
+        }
+      });
     } else {
       audio.pause();
     }
