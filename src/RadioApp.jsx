@@ -3,8 +3,8 @@ import { Sun, Moon } from 'lucide-react';
 import CardPlayer from './components/CardPlayer';
 
 const BASE_URL = "http://uk2freenew.listen2myradio.com:10718";
-const STREAM_URL = "/live";
-const STATS_URL = "/stats-api";
+const STREAM_URL = "http://uk2freenew.listen2myradio.com:10718/;";
+const STATS_URL = "https://api.allorigins.win/raw?url=http://uk2freenew.listen2myradio.com:10718/stats?sid=1&json=1";
 
 function RadioApp() {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -78,19 +78,20 @@ function RadioApp() {
     const fetchMetadata = async () => {
       if (!isOnline) return;
       if (metadataControllerRef.current) metadataControllerRef.current.abort();
-
       const controller = new AbortController();
       metadataControllerRef.current = controller;
 
       try {
         const timeoutId = setTimeout(() => controller.abort(), 8000);
-        const res = await fetch(`${STATS_URL}?t=${Date.now()}`, { signal: controller.signal });
+        const res = await fetch(`${STATS_URL}&t=${Date.now()}`, { signal: controller.signal });
         clearTimeout(timeoutId);
 
         if (res && res.ok) {
           const data = await res.json();
-          if (data && data.songtitle) {
-            const raw = data.songtitle || "";
+          // Handle allorigins nested data if needed
+          const songTitle = data?.songtitle || data?.contents?.songtitle;
+          if (songTitle) {
+            const raw = songTitle || "";
             const parts = raw.split(' - ');
             const artist = parts.length >= 2 ? parts[0].trim() : "La Espárrago Rock";
             const title = parts.length >= 2 ? parts.slice(1).join(' - ').trim() : raw.trim();
@@ -102,19 +103,19 @@ function RadioApp() {
                   return [{ artist: latestMetadataRef.current.artist, title: latestMetadataRef.current.title, cover: latestCoverRef.current }, ...prev].slice(0, 5);
                 });
               }
-              setMetadata({ artist, title: title.toLowerCase().includes("stats?") ? "Radio en Vivo" : title });
+              setMetadata({ artist, title: title.includes("stats?") ? "Radio en Vivo" : title });
             }
           }
         }
       } catch (e) {
-        // Silent fail for polling errors to avoid console noise
+        // Silent fail
       } finally {
         if (metadataControllerRef.current === controller) metadataControllerRef.current = null;
       }
     };
 
     fetchMetadata();
-    interval = setInterval(fetchMetadata, 10000);
+    interval = setInterval(fetchMetadata, 15000);
     return () => {
       clearInterval(interval);
       if (metadataControllerRef.current) metadataControllerRef.current.abort();
@@ -125,84 +126,42 @@ function RadioApp() {
   useEffect(() => {
     const audio = audioRef.current;
     let watchdogTimer = null;
-    let lastTime = -1;
-    let progressInterval = null;
 
-    const clearWatchdog = () => {
-      if (watchdogTimer) {
-        clearTimeout(watchdogTimer);
-        watchdogTimer = null;
-      }
-    };
-
-    const startWatchdog = (reason = "Stall") => {
-      if (watchdogTimer) return;
+    const startWatchdog = () => {
+      if (watchdogTimer) clearTimeout(watchdogTimer);
       if (isPlaying && isOnline) {
-        console.log(`⏱️ Radio: Recuperando por ${reason}...`);
         watchdogTimer = setTimeout(() => {
-          audio.src = `${STREAM_URL}?t=${Date.now()}`;
+          audio.src = STREAM_URL + (STREAM_URL.includes("?") ? "&" : "?") + "t=" + Date.now();
           audio.play().catch(() => { });
-          watchdogTimer = null;
-          lastTime = -1;
-        }, 12000);
+        }, 15000);
       }
     };
 
     const handlePlaying = () => {
-      clearWatchdog();
+      if (watchdogTimer) clearTimeout(watchdogTimer);
       setIsStalled(false);
     };
 
-    const handleWaitStall = () => {
-      setIsStalled(true);
-      startWatchdog("Conexión");
-    };
-
-    const handleError = () => {
-      if (audio.error?.code !== 4) {
-        handleWaitStall();
-      }
-    };
-
-    // Monitor playback progress to detect silent freezes
-    progressInterval = setInterval(() => {
-      if (isPlaying && isOnline && !isStalled) {
-        if (audio.currentTime === lastTime && !audio.paused) {
-          startWatchdog("Silencio");
-        }
-        lastTime = audio.currentTime;
-      }
-    }, 10000);
-
     audio.addEventListener('playing', handlePlaying);
-    audio.addEventListener('waiting', handleWaitStall);
-    audio.addEventListener('stalled', handleWaitStall);
-    audio.addEventListener('error', handleError);
+    audio.addEventListener('waiting', () => { setIsStalled(true); startWatchdog(); });
+    audio.addEventListener('stalled', () => { setIsStalled(true); startWatchdog(); });
+    audio.addEventListener('error', () => { if (audio.error?.code !== 4) startWatchdog(); });
 
     return () => {
       audio.removeEventListener('playing', handlePlaying);
-      audio.removeEventListener('waiting', handleWaitStall);
-      audio.removeEventListener('stalled', handleWaitStall);
-      audio.removeEventListener('error', handleError);
-      clearWatchdog();
-      if (progressInterval) clearInterval(progressInterval);
+      if (watchdogTimer) clearTimeout(watchdogTimer);
       audio.pause();
     };
-  }, [isPlaying, isOnline, isStalled]);
+  }, [isPlaying, isOnline]);
 
   // Playback Control
   useEffect(() => {
     const audio = audioRef.current;
     if (isPlaying && isOnline) {
-      if (!audio.src || !audio.src.includes(STREAM_URL)) {
-        audio.src = `${STREAM_URL}?t=${Date.now()}`;
+      if (!audio.src || !audio.src.includes("listen2myradio")) {
+        audio.src = STREAM_URL;
       }
-      audio.play().catch(err => {
-        if (err.name !== 'AbortError') {
-          console.error("Playback Error:", err);
-          setIsPlaying(false);
-        }
-      });
+      audio.play().catch(() => setIsPlaying(false));
     } else {
       audio.pause();
     }
