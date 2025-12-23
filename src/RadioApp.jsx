@@ -79,7 +79,6 @@ function RadioApp() {
     const fetchMetadata = async () => {
       if (!isOnline) return;
 
-      // Abort previous fetch if it's still running
       if (metadataControllerRef.current) {
         metadataControllerRef.current.abort();
       }
@@ -88,11 +87,19 @@ function RadioApp() {
       metadataControllerRef.current = controller;
 
       try {
+        // Set a timeout for the fetch itself
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+
         const response = await fetch(`${STATS_URL}?t=${Date.now()}`, { signal: controller.signal });
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        clearTimeout(timeoutId);
+
+        if (!response || !response.ok) {
+          // Fallback if the radio server is down or Vercel proxy hasn't updated
+          setMetadata(prev => ({ ...prev, title: prev.title || "Radio en Directo" }));
+          return;
+        }
 
         const data = await response.json();
-
         if (data && data.songtitle) {
           const parts = data.songtitle.split(' - ');
           let artist = parts.length >= 2 ? parts[0].trim() : "La Espárrago Rock";
@@ -100,7 +107,6 @@ function RadioApp() {
 
           const current = latestMetadataRef.current;
           if (current.title !== title) {
-            // Add prev to history before updating metadata
             if (current.title !== "Sintonizando...") {
               setHistory(prevHistory => {
                 const isDuplicate = prevHistory.some(song => song.title === current.title);
@@ -114,7 +120,13 @@ function RadioApp() {
           }
         }
       } catch (e) {
-        if (e.name !== 'AbortError') console.error("Metadata fetch error:", e);
+        if (e.name !== 'AbortError') {
+          console.error("Metadata fetch error:", e);
+          // Set a friendly fallback title on error
+          if (latestMetadataRef.current.title === "Sintonizando...") {
+            setMetadata({ artist: "La Espárrago Rock", title: "Emisión en Directo" });
+          }
+        }
       } finally {
         if (metadataControllerRef.current === controller) {
           metadataControllerRef.current = null;
