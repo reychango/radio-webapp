@@ -126,14 +126,18 @@ function RadioApp() {
   useEffect(() => {
     const audio = audioRef.current;
     let watchdogTimer = null;
+    let lastTime = -1;
+    let progressInterval = null;
 
-    const startWatchdog = () => {
+    const startWatchdog = (reason = "Stall") => {
       if (watchdogTimer) clearTimeout(watchdogTimer);
       if (isPlaying && isOnline) {
+        console.log(`⏱️ Radio: Recuperando por ${reason}...`);
         watchdogTimer = setTimeout(() => {
           audio.src = STREAM_URL + (STREAM_URL.includes("?") ? "&" : "?") + "t=" + Date.now();
           audio.play().catch(() => { });
-        }, 15000);
+          lastTime = -1; // Reset progress check
+        }, 12000);
       }
     };
 
@@ -142,17 +146,28 @@ function RadioApp() {
       setIsStalled(false);
     };
 
+    // Absolute progress monitor (detects silent hangs)
+    progressInterval = setInterval(() => {
+      if (isPlaying && isOnline && !isStalled) {
+        if (audio.currentTime === lastTime && !audio.paused) {
+          startWatchdog("Silencio Prolongado");
+        }
+        lastTime = audio.currentTime;
+      }
+    }, 10000);
+
     audio.addEventListener('playing', handlePlaying);
-    audio.addEventListener('waiting', () => { setIsStalled(true); startWatchdog(); });
-    audio.addEventListener('stalled', () => { setIsStalled(true); startWatchdog(); });
-    audio.addEventListener('error', () => { if (audio.error?.code !== 4) startWatchdog(); });
+    audio.addEventListener('waiting', () => { setIsStalled(true); startWatchdog("Conexión"); });
+    audio.addEventListener('stalled', () => { setIsStalled(true); startWatchdog("Buffer"); });
+    audio.addEventListener('error', () => { if (audio.error?.code !== 4) startWatchdog("Error Crítico"); });
 
     return () => {
       audio.removeEventListener('playing', handlePlaying);
       if (watchdogTimer) clearTimeout(watchdogTimer);
+      if (progressInterval) clearInterval(progressInterval);
       audio.pause();
     };
-  }, [isPlaying, isOnline]);
+  }, [isPlaying, isOnline, isStalled]);
 
   // Playback Control
   useEffect(() => {
