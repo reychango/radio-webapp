@@ -3,8 +3,8 @@ import { Sun, Moon } from 'lucide-react';
 import CardPlayer from './components/CardPlayer';
 
 const BASE_URL = "http://uk2freenew.listen2myradio.com:10718";
-const STREAM_URL = "https://corsproxy.io/?http://uk2freenew.listen2myradio.com:10718/;";
-const STATS_URL = "https://api.allorigins.win/raw?url=http://uk2freenew.listen2myradio.com:10718/stats?sid=1&json=1";
+const STREAM_URL_BASE = "http://uk2freenew.listen2myradio.com:10718/;";
+const STATS_URL = "/api/metadata";
 
 function RadioApp() {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -86,12 +86,13 @@ function RadioApp() {
 
       try {
         const timeoutId = setTimeout(() => controller.abort(), 8000);
-        const res = await fetch(`${STATS_URL}&t=${Date.now()}`, { signal: controller.signal });
+        // We use our local API which is much more reliable
+        const res = await fetch(`${STATS_URL}?t=${Date.now()}`, { signal: controller.signal });
         clearTimeout(timeoutId);
 
         if (res && res.ok) {
           const data = await res.json();
-          const songTitle = data?.songtitle || data?.contents?.songtitle;
+          const songTitle = data?.songtitle;
           if (songTitle) {
             const raw = songTitle || "";
             const parts = raw.split(' - ');
@@ -138,14 +139,19 @@ function RadioApp() {
     newAudio.addEventListener('error', () => {
       if (newAudio.error?.code !== 4 && isPlaying) {
         console.warn("⚠️ Error de audio, re-inicializando...");
-        setTimeout(setupAudio, 2000);
+        setTimeout(setupAudio, 2500);
       }
     });
 
     audioRef.current = newAudio;
     if (isPlaying) {
-      newAudio.src = STREAM_URL + "?t=" + Date.now();
-      newAudio.play().catch(() => { });
+      // Correct URL construction: encode the inner URL and use & if ? exists
+      const innerUrl = `${STREAM_URL_BASE}?t=${Date.now()}`;
+      newAudio.src = `https://corsproxy.io/?${encodeURIComponent(innerUrl)}`;
+      console.log("🔗 Conectando a:", newAudio.src);
+      newAudio.play().catch(err => {
+        console.error("❌ Error al reproducir:", err);
+      });
     }
   };
 
