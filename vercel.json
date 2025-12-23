@@ -1,11 +1,11 @@
 {
     "rewrites": [
         {
-            "source": "/radio-stream",
+            "source": "/live",
             "destination": "http://uk2freenew.listen2myradio.com:10718/;"
         },
         {
-            "source": "/radio-stats",
+            "source": "/stats-api",
             "destination": "http://uk2freenew.listen2myradio.com:10718/stats?sid=1&json=1"
         }
     ]

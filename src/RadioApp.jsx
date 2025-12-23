@@ -3,8 +3,8 @@ import { Sun, Moon } from 'lucide-react';
 import CardPlayer from './components/CardPlayer';
 
 const BASE_URL = "http://uk2freenew.listen2myradio.com:10718";
-const STREAM_URL = "/radio-stream";
-const STATS_URL = "/radio-stats";
+const STREAM_URL = "/live";
+const STATS_URL = "/stats-api";
 
 function RadioApp() {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -87,29 +87,40 @@ function RadioApp() {
       metadataControllerRef.current = controller;
 
       try {
-        // Set a timeout for the fetch itself
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        const timeoutId = setTimeout(() => controller.abort(), 9000);
 
-        const response = await fetch(`${STATS_URL}?t=${Date.now()}`, { signal: controller.signal });
+        // Use a unique variable name to avoid any potential shadowing issues
+        const statsRes = await fetch(`${STATS_URL}?t=${Date.now()}`, { signal: controller.signal });
         clearTimeout(timeoutId);
 
-        if (!response || !response.ok) {
-          // Fallback if the radio server is down or Vercel proxy hasn't updated
-          setMetadata(prev => ({ ...prev, title: prev.title || "Radio en Directo" }));
+        if (!statsRes || !statsRes.ok) {
+          if (latestMetadataRef.current.title === "Sintonizando...") {
+            setMetadata({ artist: "La Espárrago Rock", title: "Radio en Vivo" });
+          }
           return;
         }
 
-        const data = await response.json();
-        if (data && data.songtitle) {
-          const parts = data.songtitle.split(' - ');
+        // Defensive check for .json() method
+        if (typeof statsRes.json !== 'function') {
+          console.error("Fetch returned an object without .json() method");
+          return;
+        }
+
+        const statsData = await statsRes.json();
+        if (statsData && statsData.songtitle) {
+          const rawTitle = statsData.songtitle || "";
+          const parts = rawTitle.split(' - ');
           let artist = parts.length >= 2 ? parts[0].trim() : "La Espárrago Rock";
-          let title = parts.length >= 2 ? parts.slice(1).join(' - ').trim() : data.songtitle.trim();
+          let title = parts.length >= 2 ? parts.slice(1).join(' - ').trim() : rawTitle.trim();
+
+          // Sanitize
+          if (title.toLowerCase().includes("stats?sid=")) title = "Radio en Directo";
 
           const current = latestMetadataRef.current;
           if (current.title !== title) {
             if (current.title !== "Sintonizando...") {
               setHistory(prevHistory => {
-                const isDuplicate = prevHistory.some(song => song.title === current.title);
+                const isDuplicate = prevHistory.some(song => song.title === title);
                 if (!isDuplicate) {
                   return [{ artist: current.artist, title: current.title, cover: latestCoverRef.current }, ...prevHistory].slice(0, 5);
                 }
@@ -121,10 +132,9 @@ function RadioApp() {
         }
       } catch (e) {
         if (e.name !== 'AbortError') {
-          console.error("Metadata fetch error:", e);
-          // Set a friendly fallback title on error
+          console.error("Metadata fetch system error:", e);
           if (latestMetadataRef.current.title === "Sintonizando...") {
-            setMetadata({ artist: "La Espárrago Rock", title: "Emisión en Directo" });
+            setMetadata({ artist: "La Espárrago Rock", title: "La Espárrago Rock" });
           }
         }
       } finally {
@@ -199,6 +209,13 @@ function RadioApp() {
       audio.pause();
       audio.src = "";
     };
+  }, [isPlaying, isOnline]);
+
+  // Debug log for stream source
+  useEffect(() => {
+    if (audioRef.current.src) {
+      console.log("Audio Source Update:", audioRef.current.src);
+    }
   }, [isPlaying, isOnline]);
 
   // Playback Control
