@@ -75,72 +75,41 @@ function RadioApp() {
   // Metadata polling
   useEffect(() => {
     let interval;
-
     const fetchMetadata = async () => {
       if (!isOnline) return;
-
-      if (metadataControllerRef.current) {
-        metadataControllerRef.current.abort();
-      }
+      if (metadataControllerRef.current) metadataControllerRef.current.abort();
 
       const controller = new AbortController();
       metadataControllerRef.current = controller;
 
       try {
-        const timeoutId = setTimeout(() => controller.abort(), 9000);
-
-        // Use a unique variable name to avoid any potential shadowing issues
-        const statsRes = await fetch(`${STATS_URL}?t=${Date.now()}`, { signal: controller.signal });
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        const res = await fetch(`${STATS_URL}?t=${Date.now()}`, { signal: controller.signal });
         clearTimeout(timeoutId);
 
-        if (!statsRes || !statsRes.ok) {
-          if (latestMetadataRef.current.title === "Sintonizando...") {
-            setMetadata({ artist: "La Espárrago Rock", title: "Radio en Vivo" });
-          }
-          return;
-        }
+        if (res && res.ok) {
+          const data = await res.json();
+          if (data && data.songtitle) {
+            const raw = data.songtitle || "";
+            const parts = raw.split(' - ');
+            const artist = parts.length >= 2 ? parts[0].trim() : "La Espárrago Rock";
+            const title = parts.length >= 2 ? parts.slice(1).join(' - ').trim() : raw.trim();
 
-        // Defensive check for .json() method
-        if (typeof statsRes.json !== 'function') {
-          console.error("Fetch returned an object without .json() method");
-          return;
-        }
-
-        const statsData = await statsRes.json();
-        if (statsData && statsData.songtitle) {
-          const rawTitle = statsData.songtitle || "";
-          const parts = rawTitle.split(' - ');
-          let artist = parts.length >= 2 ? parts[0].trim() : "La Espárrago Rock";
-          let title = parts.length >= 2 ? parts.slice(1).join(' - ').trim() : rawTitle.trim();
-
-          // Sanitize
-          if (title.toLowerCase().includes("stats?sid=")) title = "Radio en Directo";
-
-          const current = latestMetadataRef.current;
-          if (current.title !== title) {
-            if (current.title !== "Sintonizando...") {
-              setHistory(prevHistory => {
-                const isDuplicate = prevHistory.some(song => song.title === title);
-                if (!isDuplicate) {
-                  return [{ artist: current.artist, title: current.title, cover: latestCoverRef.current }, ...prevHistory].slice(0, 5);
-                }
-                return prevHistory;
-              });
+            if (latestMetadataRef.current.title !== title) {
+              if (latestMetadataRef.current.title !== "Sintonizando...") {
+                setHistory(prev => {
+                  if (prev.some(s => s.title === title)) return prev;
+                  return [{ artist: latestMetadataRef.current.artist, title: latestMetadataRef.current.title, cover: latestCoverRef.current }, ...prev].slice(0, 5);
+                });
+              }
+              setMetadata({ artist, title: title.toLowerCase().includes("stats?") ? "Radio en Vivo" : title });
             }
-            setMetadata({ artist, title });
           }
         }
       } catch (e) {
-        if (e.name !== 'AbortError') {
-          console.error("Metadata fetch system error:", e);
-          if (latestMetadataRef.current.title === "Sintonizando...") {
-            setMetadata({ artist: "La Espárrago Rock", title: "La Espárrago Rock" });
-          }
-        }
+        // Silent fail for polling errors to avoid console noise
       } finally {
-        if (metadataControllerRef.current === controller) {
-          metadataControllerRef.current = null;
-        }
+        if (metadataControllerRef.current === controller) metadataControllerRef.current = null;
       }
     };
 
@@ -157,94 +126,43 @@ function RadioApp() {
     const audio = audioRef.current;
     let watchdogTimer = null;
 
-    const resetWatchdog = () => {
-      if (watchdogTimer) clearTimeout(watchdogTimer);
-      watchdogTimer = null;
-    };
-
     const startWatchdog = () => {
-      resetWatchdog();
+      if (watchdogTimer) clearTimeout(watchdogTimer);
       if (isPlaying && isOnline) {
         watchdogTimer = setTimeout(() => {
-          console.warn("Audio watchdog triggered: Re-syncing stream...");
-          const playUrl = `${STREAM_URL}?t=${Date.now()}`;
-          audio.src = playUrl;
-          audio.play().catch(e => console.error("Watchdog restart failed:", e));
-        }, 12000); // 12s to allow for buffering
+          audio.src = `${STREAM_URL}?t=${Date.now()}`;
+          audio.play().catch(() => { });
+        }, 12000);
       }
     };
 
     const handlePlaying = () => {
-      resetWatchdog();
+      if (watchdogTimer) clearTimeout(watchdogTimer);
       setIsStalled(false);
     };
-    const handleWaiting = () => {
-      startWatchdog();
-      setIsStalled(true);
-    };
-    const handleStalled = () => {
-      startWatchdog();
-      setIsStalled(true);
-    };
 
-    // Squelch noisy logs, only log true failures
-    const handleError = (e) => {
-      if (audio.error && audio.error.code !== 4) {
-        console.error("Audio internal error:", audio.error);
-        startWatchdog();
-      }
-    };
-
-    audio.addEventListener('error', handleError);
     audio.addEventListener('playing', handlePlaying);
-    audio.addEventListener('waiting', handleWaiting);
-    audio.addEventListener('stalled', handleStalled);
+    audio.addEventListener('waiting', () => { setIsStalled(true); startWatchdog(); });
+    audio.addEventListener('stalled', () => { setIsStalled(true); startWatchdog(); });
+    audio.addEventListener('error', () => { if (audio.error?.code !== 4) startWatchdog(); });
 
     return () => {
-      audio.removeEventListener('error', handleError);
       audio.removeEventListener('playing', handlePlaying);
-      audio.removeEventListener('waiting', handleWaiting);
-      audio.removeEventListener('stalled', handleStalled);
-      resetWatchdog();
+      if (watchdogTimer) clearTimeout(watchdogTimer);
       audio.pause();
-      audio.src = "";
     };
-  }, [isPlaying, isOnline]);
-
-  // Debug log for stream source
-  useEffect(() => {
-    if (audioRef.current.src) {
-      console.log("Audio Source Update:", audioRef.current.src);
-    }
   }, [isPlaying, isOnline]);
 
   // Playback Control
   useEffect(() => {
     const audio = audioRef.current;
     if (isPlaying && isOnline) {
-      if (!audio.src || audio.src === "" || audio.src.includes("?t=")) {
-        const playUrl = `${STREAM_URL}?t=${Date.now()}`;
-        // Only update src if it's completely empty or we explicitly need a fresh cache-busted URL
-        if (audio.src.indexOf(STREAM_URL) === -1) {
-          audio.src = playUrl;
-        }
+      if (!audio.src || !audio.src.includes(STREAM_URL)) {
+        audio.src = `${STREAM_URL}?t=${Date.now()}`;
       }
-
-      const playPromise = audio.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(error => {
-          if (error.name !== 'AbortError') {
-            console.error("Playback failed:", error);
-            setIsPlaying(false);
-          }
-        });
-      }
+      audio.play().catch(() => setIsPlaying(false));
     } else {
       audio.pause();
-      if (!isPlaying) {
-        audio.src = "";
-        audio.load();
-      }
     }
   }, [isPlaying, isOnline]);
 
