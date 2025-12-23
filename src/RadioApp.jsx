@@ -3,8 +3,8 @@ import { Sun, Moon } from 'lucide-react';
 import CardPlayer from './components/CardPlayer';
 
 const BASE_URL = "http://uk2freenew.listen2myradio.com:10718";
-const STREAM_URL = "/proxy-stream";
-const STATS_URL = "/proxy-stats";
+const STREAM_URL = "https://corsproxy.io/?http://uk2freenew.listen2myradio.com:10718/;";
+const STATS_URL = "https://api.allorigins.win/raw?url=http://uk2freenew.listen2myradio.com:10718/stats?sid=1&json=1";
 
 function RadioApp() {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -16,9 +16,17 @@ function RadioApp() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isStalled, setIsStalled] = useState(false);
 
-  const audioRef = useRef(new Audio());
+  const audioRef = useRef(null);
   const latestMetadataRef = useRef(metadata);
   const latestCoverRef = useRef(coverUrl);
+  const latestVolumeRef = useRef(volume);
+
+  // Initialize audio on mount
+  useEffect(() => {
+    if (!audioRef.current) {
+      audioRef.current = new Audio();
+    }
+  }, []);
 
   // Network state detection
   useEffect(() => {
@@ -32,18 +40,13 @@ function RadioApp() {
     };
   }, []);
 
-  // Apply theme to body
-  useEffect(() => {
-    if (!isDarkMode) {
-      document.body.classList.add('light-theme');
-    } else {
-      document.body.classList.remove('light-theme');
-    }
-  }, [isDarkMode]);
-
   // Sync refs
   useEffect(() => { latestMetadataRef.current = metadata; }, [metadata]);
   useEffect(() => { latestCoverRef.current = coverUrl; }, [coverUrl]);
+  useEffect(() => {
+    latestVolumeRef.current = volume;
+    if (audioRef.current) audioRef.current.volume = volume;
+  }, [volume]);
 
   // Fetch Cover Art
   useEffect(() => {
@@ -83,12 +86,11 @@ function RadioApp() {
 
       try {
         const timeoutId = setTimeout(() => controller.abort(), 8000);
-        const res = await fetch(`${STATS_URL}?t=${Date.now()}`, { signal: controller.signal });
+        const res = await fetch(`${STATS_URL}&t=${Date.now()}`, { signal: controller.signal });
         clearTimeout(timeoutId);
 
         if (res && res.ok) {
           const data = await res.json();
-          // Handle allorigins nested data if needed
           const songTitle = data?.songtitle || data?.contents?.songtitle;
           if (songTitle) {
             const raw = songTitle || "";
@@ -107,9 +109,7 @@ function RadioApp() {
             }
           }
         }
-      } catch (e) {
-        // Silent fail
-      } finally {
+      } catch (e) { } finally {
         if (metadataControllerRef.current === controller) metadataControllerRef.current = null;
       }
     };
@@ -122,72 +122,57 @@ function RadioApp() {
     };
   }, [isOnline]);
 
-  // Audio Initialization & Global Listeners
+  const setupAudio = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = "";
+      audioRef.current.load();
+    }
+    const newAudio = new Audio();
+    newAudio.volume = latestVolumeRef.current;
+
+    // Transfer listeners
+    newAudio.addEventListener('playing', () => setIsStalled(false));
+    newAudio.addEventListener('waiting', () => setIsStalled(true));
+    newAudio.addEventListener('stalled', () => setIsStalled(true));
+    newAudio.addEventListener('error', () => {
+      if (newAudio.error?.code !== 4 && isPlaying) {
+        console.warn("⚠️ Error de audio, re-inicializando...");
+        setTimeout(setupAudio, 2000);
+      }
+    });
+
+    audioRef.current = newAudio;
+    if (isPlaying) {
+      newAudio.src = STREAM_URL + "?t=" + Date.now();
+      newAudio.play().catch(() => { });
+    }
+  };
+
+  // Lifecycle
   useEffect(() => {
-    const audio = audioRef.current;
-    let watchdogTimer = null;
     let lastTime = -1;
-    let progressInterval = null;
-
-    const startWatchdog = (reason = "Stall") => {
-      if (watchdogTimer) clearTimeout(watchdogTimer);
-      if (isPlaying && isOnline) {
-        console.log(`⏱️ Radio: Recuperando por ${reason}...`);
-        watchdogTimer = setTimeout(() => {
-          audio.src = STREAM_URL + (STREAM_URL.includes("?") ? "&" : "?") + "t=" + Date.now();
-          audio.play().catch(() => { });
-          lastTime = -1; // Reset progress check
-        }, 12000);
-      }
-    };
-
-    const handlePlaying = () => {
-      if (watchdogTimer) clearTimeout(watchdogTimer);
-      setIsStalled(false);
-    };
-
-    // Absolute progress monitor (detects silent hangs)
-    progressInterval = setInterval(() => {
-      if (isPlaying && isOnline && !isStalled) {
-        if (audio.currentTime === lastTime && !audio.paused) {
-          startWatchdog("Silencio Prolongado");
+    let progressInterval = setInterval(() => {
+      if (isPlaying && isOnline && audioRef.current && !isStalled) {
+        if (audioRef.current.currentTime === lastTime && !audioRef.current.paused) {
+          console.log("⏱️ Silencio detectado, forzando refresh...");
+          setupAudio();
         }
-        lastTime = audio.currentTime;
+        lastTime = audioRef.current.currentTime;
       }
-    }, 10000);
+    }, 15000);
 
-    audio.addEventListener('playing', handlePlaying);
-    audio.addEventListener('waiting', () => { setIsStalled(true); startWatchdog("Conexión"); });
-    audio.addEventListener('stalled', () => { setIsStalled(true); startWatchdog("Buffer"); });
-    audio.addEventListener('error', () => { if (audio.error?.code !== 4) startWatchdog("Error Crítico"); });
-
-    return () => {
-      audio.removeEventListener('playing', handlePlaying);
-      if (watchdogTimer) clearTimeout(watchdogTimer);
-      if (progressInterval) clearInterval(progressInterval);
-      audio.pause();
-    };
+    return () => clearInterval(progressInterval);
   }, [isPlaying, isOnline, isStalled]);
 
   // Playback Control
   useEffect(() => {
-    const audio = audioRef.current;
     if (isPlaying && isOnline) {
-      if (!audio.src || !audio.src.includes("listen2myradio")) {
-        audio.src = STREAM_URL;
-      }
-      audio.play().catch(() => setIsPlaying(false));
-    } else {
-      audio.pause();
+      setupAudio();
+    } else if (audioRef.current) {
+      audioRef.current.pause();
     }
   }, [isPlaying, isOnline]);
-
-  // Volume Control
-  useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.volume = volume;
-    }
-  }, [volume]);
 
   const handleStop = () => {
     setIsPlaying(false);
