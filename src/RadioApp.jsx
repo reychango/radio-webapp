@@ -4,9 +4,7 @@ import CardPlayer from './components/CardPlayer';
 
 const BASE_URL = "http://uk2freenew.listen2myradio.com:10718";
 const STREAM_URL = "/radio-stream";
-// Using a reliable HTTPS proxy for metadata to avoid "Mixed Content" errors on Vercel
-const PROXY_URL = "https://api.allorigins.win/raw?url=";
-const STATS_URL = `${BASE_URL}/stats?sid=1&json=1`;
+const STATS_URL = "/radio-stats";
 
 function RadioApp() {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -90,7 +88,9 @@ function RadioApp() {
       metadataControllerRef.current = controller;
 
       try {
-        const response = await fetch(`${PROXY_URL}${encodeURIComponent(STATS_URL + "&t=" + Date.now())}`, { signal: controller.signal });
+        const response = await fetch(`${STATS_URL}?t=${Date.now()}`, { signal: controller.signal });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
         const data = await response.json();
 
         if (data && data.songtitle) {
