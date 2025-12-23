@@ -1,11 +1,16 @@
 import { Play, Pause, Square, Volume2, VolumeX } from 'lucide-react';
 
-const CardPlayer = ({ isPlaying, onPlayPause, onStop, volume, onVolumeChange, metadata }) => {
+const CardPlayer = ({ isPlaying, isStalled, onPlayPause, onStop, volume, onVolumeChange, metadata }) => {
     return (
         <div className="controls-wrapper">
 
             {/* Title & Artist */}
             <div>
+                {isStalled ? (
+                    <div className="status-badge" style={{ color: '#3b82f6', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.25rem' }}>
+                        RECUPERANDO...
+                    </div>
+                ) : null}
                 <h2 className="title">{metadata.title}</h2>
                 <p className="artist">{metadata.artist}</p>
             </div>

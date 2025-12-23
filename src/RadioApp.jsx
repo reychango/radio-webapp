@@ -15,10 +15,24 @@ function RadioApp() {
   const [history, setHistory] = useState([]);
   const [coverUrl, setCoverUrl] = useState("/logo.png");
   const [isDarkMode, setIsDarkMode] = useState(true);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isStalled, setIsStalled] = useState(false);
 
   const audioRef = useRef(new Audio());
   const latestMetadataRef = useRef(metadata);
   const latestCoverRef = useRef(coverUrl);
+
+  // Network state detection
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // Apply theme to body
   useEffect(() => {
@@ -39,10 +53,11 @@ function RadioApp() {
       setCoverUrl("/logo.png");
       return;
     }
+    const controller = new AbortController();
     const fetchCover = async () => {
       try {
         const query = encodeURIComponent(`${metadata.artist} ${metadata.title}`);
-        const response = await fetch(`https://itunes.apple.com/search?term=${query}&media=music&limit=1`);
+        const response = await fetch(`https://itunes.apple.com/search?term=${query}&media=music&limit=1`, { signal: controller.signal });
         const data = await response.json();
         if (data.results && data.results.length > 0) {
           setCoverUrl(data.results[0].artworkUrl100.replace('100x100bb', '600x600bb'));
@@ -50,17 +65,22 @@ function RadioApp() {
           setCoverUrl("/logo.png");
         }
       } catch (e) {
-        setCoverUrl("/logo.png");
+        if (e.name !== 'AbortError') setCoverUrl("/logo.png");
       }
     };
     fetchCover();
+    return () => controller.abort();
   }, [metadata.artist, metadata.title]);
 
   // Metadata polling
   useEffect(() => {
+    let interval;
+    const controller = new AbortController();
+
     const fetchMetadata = async () => {
+      if (!isOnline) return;
       try {
-        const response = await fetch(`${PROXY_URL}${encodeURIComponent(STATS_URL + "&t=" + Date.now())}`);
+        const response = await fetch(`${PROXY_URL}${encodeURIComponent(STATS_URL + "&t=" + Date.now())}`, { signal: controller.signal });
         const data = await response.json();
 
         if (data && data.songtitle) {
@@ -84,49 +104,94 @@ function RadioApp() {
           }
         }
       } catch (e) {
-        console.error("Metadata fetch error:", e);
+        if (e.name !== 'AbortError') console.error("Metadata fetch error:", e);
       }
     };
 
     fetchMetadata();
-    const interval = setInterval(fetchMetadata, 10000);
-    return () => clearInterval(interval);
-  }, []);
+    interval = setInterval(fetchMetadata, 10000);
+    return () => {
+      clearInterval(interval);
+      controller.abort();
+    };
+  }, [isOnline]);
 
   // Audio Initialization & Global Listeners
   useEffect(() => {
     const audio = audioRef.current;
+    let watchdogTimer = null;
+
+    const resetWatchdog = () => {
+      if (watchdogTimer) clearTimeout(watchdogTimer);
+      watchdogTimer = null;
+    };
+
+    const startWatchdog = () => {
+      resetWatchdog();
+      if (isPlaying && isOnline) {
+        watchdogTimer = setTimeout(() => {
+          console.warn("Audio watchdog triggered: Re-syncing stream...");
+          const playUrl = `${STREAM_URL}?t=${Date.now()}`;
+          audio.src = playUrl;
+          audio.play().catch(e => console.error("Watchdog restart failed:", e));
+        }, 12000); // 12s to allow for buffering
+      }
+    };
+
+    const handlePlaying = () => {
+      resetWatchdog();
+      setIsStalled(false);
+    };
+    const handleWaiting = () => {
+      startWatchdog();
+      setIsStalled(true);
+    };
+    const handleStalled = () => {
+      startWatchdog();
+      setIsStalled(true);
+    };
 
     // Squelch noisy logs, only log true failures
     const handleError = (e) => {
-      if (audio.error && audio.error.code !== 4) { // 4 often means "not playing yet" or manually stopped
+      if (audio.error && audio.error.code !== 4) {
         console.error("Audio internal error:", audio.error);
+        startWatchdog();
       }
     };
 
     audio.addEventListener('error', handleError);
+    audio.addEventListener('playing', handlePlaying);
+    audio.addEventListener('waiting', handleWaiting);
+    audio.addEventListener('stalled', handleStalled);
 
     return () => {
       audio.removeEventListener('error', handleError);
+      audio.removeEventListener('playing', handlePlaying);
+      audio.removeEventListener('waiting', handleWaiting);
+      audio.removeEventListener('stalled', handleStalled);
+      resetWatchdog();
       audio.pause();
       audio.src = "";
     };
-  }, []);
+  }, [isPlaying, isOnline]);
 
   // Playback Control
   useEffect(() => {
     const audio = audioRef.current;
-    if (isPlaying) {
-      // Using semicolon-only URL which is most compatible
+    if (isPlaying && isOnline) {
       const playUrl = `${STREAM_URL}?t=${Date.now()}`;
       audio.src = playUrl;
       audio.play().catch(() => setIsPlaying(false));
     } else {
       audio.pause();
-      audio.src = "";
-      audio.load();
+      if (!isOnline && isPlaying) {
+        // Just pause, keep isPlaying true to resume when back online
+      } else {
+        audio.src = "";
+        audio.load();
+      }
     }
-  }, [isPlaying]);
+  }, [isPlaying, isOnline]);
 
   // Volume Control
   useEffect(() => {
@@ -173,6 +238,7 @@ function RadioApp() {
           {/* Controls Right */}
           <CardPlayer
             isPlaying={isPlaying}
+            isStalled={isStalled}
             onPlayPause={() => setIsPlaying(!isPlaying)}
             onStop={handleStop}
             volume={volume}
@@ -212,6 +278,15 @@ function RadioApp() {
         </section>
 
       </main>
+
+      {/* Ad Placement */}
+      <section className="ad-section">
+        <div className="ad-wrapper">
+          <div className="ad-label">Publicidad</div>
+          {/* Aquí puedes pegar el código de AdSense o Monetag una vez lo tengas */}
+          <div style={{ fontSize: '0.8rem', opacity: 0.3, fontStyle: 'italic' }}>Espacio reservado para anunciantes</div>
+        </div>
+      </section>
 
       {/* Friends Links */}
       <section className="friends-links">
