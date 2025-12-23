@@ -72,13 +72,23 @@ function RadioApp() {
     return () => controller.abort();
   }, [metadata.artist, metadata.title]);
 
+  const metadataControllerRef = useRef(null);
+
   // Metadata polling
   useEffect(() => {
     let interval;
-    const controller = new AbortController();
 
     const fetchMetadata = async () => {
       if (!isOnline) return;
+
+      // Abort previous fetch if it's still running
+      if (metadataControllerRef.current) {
+        metadataControllerRef.current.abort();
+      }
+
+      const controller = new AbortController();
+      metadataControllerRef.current = controller;
+
       try {
         const response = await fetch(`${PROXY_URL}${encodeURIComponent(STATS_URL + "&t=" + Date.now())}`, { signal: controller.signal });
         const data = await response.json();
@@ -105,6 +115,10 @@ function RadioApp() {
         }
       } catch (e) {
         if (e.name !== 'AbortError') console.error("Metadata fetch error:", e);
+      } finally {
+        if (metadataControllerRef.current === controller) {
+          metadataControllerRef.current = null;
+        }
       }
     };
 
@@ -112,7 +126,7 @@ function RadioApp() {
     interval = setInterval(fetchMetadata, 10000);
     return () => {
       clearInterval(interval);
-      controller.abort();
+      if (metadataControllerRef.current) metadataControllerRef.current.abort();
     };
   }, [isOnline]);
 
@@ -179,14 +193,26 @@ function RadioApp() {
   useEffect(() => {
     const audio = audioRef.current;
     if (isPlaying && isOnline) {
-      const playUrl = `${STREAM_URL}?t=${Date.now()}`;
-      audio.src = playUrl;
-      audio.play().catch(() => setIsPlaying(false));
+      if (!audio.src || audio.src === "" || audio.src.includes("?t=")) {
+        const playUrl = `${STREAM_URL}?t=${Date.now()}`;
+        // Only update src if it's completely empty or we explicitly need a fresh cache-busted URL
+        if (audio.src.indexOf(STREAM_URL) === -1) {
+          audio.src = playUrl;
+        }
+      }
+
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(error => {
+          if (error.name !== 'AbortError') {
+            console.error("Playback failed:", error);
+            setIsPlaying(false);
+          }
+        });
+      }
     } else {
       audio.pause();
-      if (!isOnline && isPlaying) {
-        // Just pause, keep isPlaying true to resume when back online
-      } else {
+      if (!isPlaying) {
         audio.src = "";
         audio.load();
       }

@@ -17,7 +17,7 @@ const CardPlayer = ({ isPlaying, isStalled, onPlayPause, onStop, volume, onVolum
 
             {/* Vumeter Visualization */}
             <div className={`vumeter-container ${isPlaying ? 'vumeter-active' : ''}`} style={{ marginTop: '1.5rem' }}>
-                {[...Array(24)].map((_, i) => (
+                {[...Array(12)].map((_, i) => (
                     <div key={i} className="vumeter-bar"></div>
                 ))}
             </div>
