@@ -1,3 +1,12 @@
 {
-    "rewrites": []
+    "rewrites": [
+        {
+            "source": "/proxy-stream",
+            "destination": "http://uk2freenew.listen2myradio.com:10718/;"
+        },
+        {
+            "source": "/proxy-stats",
+            "destination": "http://uk2freenew.listen2myradio.com:10718/stats?sid=1&json=1"
+        }
+    ]
 }

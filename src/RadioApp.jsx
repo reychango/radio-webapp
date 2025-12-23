@@ -3,8 +3,8 @@ import { Sun, Moon } from 'lucide-react';
 import CardPlayer from './components/CardPlayer';
 
 const BASE_URL = "http://uk2freenew.listen2myradio.com:10718";
-const STREAM_URL = "http://uk2freenew.listen2myradio.com:10718/;";
-const STATS_URL = "https://api.allorigins.win/raw?url=http://uk2freenew.listen2myradio.com:10718/stats?sid=1&json=1";
+const STREAM_URL = "/proxy-stream";
+const STATS_URL = "/proxy-stats";
 
 function RadioApp() {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -83,7 +83,7 @@ function RadioApp() {
 
       try {
         const timeoutId = setTimeout(() => controller.abort(), 8000);
-        const res = await fetch(`${STATS_URL}&t=${Date.now()}`, { signal: controller.signal });
+        const res = await fetch(`${STATS_URL}?t=${Date.now()}`, { signal: controller.signal });
         clearTimeout(timeoutId);
 
         if (res && res.ok) {
