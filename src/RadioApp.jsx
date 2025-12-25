@@ -153,13 +153,13 @@ function RadioApp() {
     // newAudio.crossOrigin = "anonymous";
 
     newAudio.addEventListener('error', (e) => {
-      console.error("❌ Error de audio. Recuperando en 5s...");
-      if (isPlaying) setTimeout(setupAudio, 5000);
+      console.error("❌ Error de audio. Re-intentando silenciosamente en 15s...");
+      if (isPlaying) setTimeout(setupAudio, 15000);
     });
 
     newAudio.addEventListener('ended', () => {
-      console.warn("🏁 Stream finalizado por el servidor. Reconectando...");
-      if (isPlaying) setTimeout(setupAudio, 5000);
+      console.warn("🏁 Conexión finalizada. Recuperando en 15s...");
+      if (isPlaying) setTimeout(setupAudio, 15000);
     });
 
     newAudio.addEventListener('playing', () => {
