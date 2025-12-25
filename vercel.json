@@ -2,7 +2,7 @@
     "rewrites": [
         {
             "source": "/radio-stream",
-            "destination": "http://uk2freenew.listen2myradio.com:10718/;"
+            "destination": "http://88.150.230.110:10718/;"
         }
     ]
 }

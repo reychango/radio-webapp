@@ -129,11 +129,10 @@ function RadioApp() {
         audioRef.current.pause();
         audioRef.current.src = "";
         audioRef.current.load();
-        audioRef.current.removeEventListener('playing', () => { });
-        audioRef.current.removeEventListener('waiting', () => { });
-        audioRef.current.removeEventListener('stalled', () => { });
-        audioRef.current.removeEventListener('error', () => { });
-        audioRef.current.removeEventListener('ended', () => { });
+        // Clear all listeners by cloning
+        const oldAudio = audioRef.current;
+        const newAudioEl = oldAudio.cloneNode(true);
+        oldAudio.parentNode?.replaceChild(newAudioEl, oldAudio);
       } catch (e) { }
     }
 
@@ -156,24 +155,29 @@ function RadioApp() {
       setIsStalled(true);
     });
 
+    newAudio.addEventListener('suspend', () => {
+      console.log("⏹️ Carga suspendida");
+    });
+
     newAudio.addEventListener('ended', () => {
       console.warn("🏁 Stream finalizado de forma inesperada. Reiniciando...");
       setupAudio();
     });
 
     newAudio.addEventListener('error', (e) => {
-      console.error("❌ Error de audio crítico:", newAudio.error);
+      const err = newAudio.error;
+      console.error("❌ Error de audio crítico:", err?.code, err?.message);
       if (isPlaying) {
-        console.warn("🔄 Re-inicializando en 3s por error...");
-        setTimeout(setupAudio, 3000);
+        console.warn("🔄 Re-inicializando en 2s por error...");
+        setTimeout(setupAudio, 2000);
       }
     });
 
     audioRef.current = newAudio;
 
     if (isPlaying) {
-      // Usamos el proxy de Vercel (más estable que los gratuitos externos)
-      const proxyUrl = `/radio-stream?t=${Date.now()}`;
+      // Usamos el proxy de Vercel (con la IP directa configurada en vercel.json)
+      const proxyUrl = `/radio-stream?cache=${Date.now()}`;
       newAudio.src = proxyUrl;
 
       console.log("🔗 Conectando:", proxyUrl);
@@ -192,13 +196,13 @@ function RadioApp() {
       if (isPlaying && isOnline && audioRef.current) {
         const currentTime = audioRef.current.currentTime;
 
-        // Log detallado para diagnóstico si hay silencio
+        // Si el tiempo no avanza, sumamos al contador
         if (currentTime === lastTime && !audioRef.current.paused) {
           sameTimeCount++;
-          console.log(`📊 Watchdog: Stream sin avance (${sameTimeCount}/2). stalled=${isStalled}`);
+          console.log(`📊 Watchdog: Stream sin avance (${sameTimeCount}/3)`);
 
-          if (sameTimeCount >= 2) { // 20 segundos sin avance real
-            console.log("⏱️ Watchdog: Stream congelado CRÍTICO. Forzando reconexión...");
+          if (sameTimeCount >= 3) { // 15 segundos reales (5s * 3)
+            console.warn("🚀 Watchdog: Stream congelado. Forzando reconexión inmediata...");
             sameTimeCount = 0;
             setupAudio();
           }
@@ -208,7 +212,7 @@ function RadioApp() {
 
         lastTime = currentTime;
       }
-    }, 10000);
+    }, 5000);
 
     return () => clearInterval(progressInterval);
   }, [isPlaying, isOnline, isStalled]);
