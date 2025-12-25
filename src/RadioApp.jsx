@@ -3,7 +3,8 @@ import { Sun, Moon } from 'lucide-react';
 import CardPlayer from './components/CardPlayer';
 
 const BASE_URL = "http://uk2freenew.listen2myradio.com:10718";
-const STREAM_URL_BASE = "http://uk2freenew.listen2myradio.com:10718/;";
+const STREAM_URL_BASE = "http://88.150.230.110:10718/stream";
+const PROXY_URL = "/radio-stream"; // Cambiar por la URL de tu Cloudflare Worker (ej: https://tu-worker.workers.dev)
 const STATS_URL = "/api/metadata";
 
 function RadioApp() {
@@ -166,8 +167,8 @@ function RadioApp() {
     audioRef.current = newAudio;
 
     if (isPlaying) {
-      // Volvemos al proxy estable de vercel.json
-      const proxyUrl = `/radio-stream?v=${Date.now()}`;
+      // Usamos el proxy (Vercel o Cloudflare Worker)
+      const proxyUrl = `${PROXY_URL}?v=${Date.now()}`;
       newAudio.src = proxyUrl;
       newAudio.play().catch(() => {
         // Silently retry on next watchdog
