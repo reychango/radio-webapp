@@ -138,7 +138,7 @@ function RadioApp() {
       } catch (e) { }
     }
 
-    console.log("🛠️ Re-conectando (V16-STREAMS)...");
+    console.log("🛠️ Re-conectando (V17-ULTIMATE)...");
     const newAudio = new Audio();
     newAudio.volume = latestVolumeRef.current;
     // For same-origin proxy, we don't need crossOrigin which can be stricter
@@ -190,7 +190,7 @@ function RadioApp() {
           sameTimeCount++;
           // Si pasan 5-6 segundos sin avance real, reiniciamos
           if (sameTimeCount >= 2) {
-            console.warn("🚀 Watchdog (V16): Silencio detectado, reiniciando...");
+            console.warn("🚀 Watchdog (V17): Silencio prolongado, reconectando...");
             sameTimeCount = 0;
             setupAudio();
           }
@@ -200,7 +200,7 @@ function RadioApp() {
 
         lastTime = currentTime;
       }
-    }, 15000); // 15s check
+    }, 20000); // 20s para dejar que el buffer se llene
 
     return () => clearInterval(progressInterval);
   }, [isPlaying, isOnline, isStalled]);
