@@ -138,7 +138,7 @@ function RadioApp() {
       } catch (e) { }
     }
 
-    console.log("🛠️ Re-conectando (V18-NATURAL)...");
+    console.log("🛠️ Re-conectando (V19-SAVIOR)...");
     const newAudio = new Audio();
     newAudio.volume = latestVolumeRef.current;
     // For same-origin proxy, we don't need crossOrigin which can be stricter
@@ -190,7 +190,7 @@ function RadioApp() {
           sameTimeCount++;
           // Si pasan 5-6 segundos sin avance real, reiniciamos
           if (sameTimeCount >= 2) {
-            console.warn("🚀 Watchdog (V18): Silencio total, reiniciando flujo...");
+            console.warn("🚀 Watchdog (V19): Silencio total, reiniciando flujo...");
             sameTimeCount = 0;
             setupAudio();
           }

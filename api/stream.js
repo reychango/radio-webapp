@@ -1,43 +1,41 @@
-export const config = {
-    runtime: 'edge',
-};
+const http = require('http');
 
-export default async function handler(req) {
-    // Usamos el dominio y el punto y coma (;) que es lo más estable
-    const streamUrl = "http://uk2freenew.listen2myradio.com:10718/;";
+export default function handler(req, res) {
+    // Configuración de CORS
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
 
-    try {
-        const response = await fetch(streamUrl, {
-            method: 'GET',
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'audio/mpeg, */*',
-                'Icy-MetaData': '0'
-            }
-        });
-
-        if (!response.ok) {
-            return new Response(`Radio Server Status: ${response.status}`, {
-                status: 502,
-                headers: { "Access-Control-Allow-Origin": "*" }
-            });
-        }
-
-        // Retornamos una respuesta con cabeceras que obligan a mantener la conexión
-        return new Response(response.body, {
-            status: 200,
-            headers: {
-                "Content-Type": "audio/mpeg",
-                "Access-Control-Allow-Origin": "*",
-                "Cache-Control": "no-cache, no-store, must-revalidate",
-                "Connection": "keep-alive",
-                "X-V18-Status": "Natural-Flow"
-            },
-        });
-    } catch (error) {
-        return new Response(`Proxy Error: ${error.message}`, {
-            status: 500,
-            headers: { "Access-Control-Allow-Origin": "*" },
-        });
+    if (req.method === 'OPTIONS') {
+        res.status(200).end();
+        return;
     }
+
+    const streamUrl = "http://uk2freenew.listen2myradio.com:10718/stream";
+
+    const options = {
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'audio/mpeg, */*',
+            'Icy-MetaData': '0'
+        },
+        timeout: 10000
+    };
+
+    http.get(streamUrl, options, (streamRes) => {
+        // Forzamos el Content-Type correcto para que el navegador lo identifique como MP3
+        res.setHeader('Content-Type', 'audio/mpeg');
+        res.setHeader('Connection', 'keep-alive');
+
+        // Hacemos el pipe directo del chorro de audio al navegador
+        streamRes.pipe(res);
+
+        streamRes.on('error', (err) => {
+            console.error('Radio Stream Error:', err);
+            res.end();
+        });
+    }).on('error', (err) => {
+        console.error('Radio Request Error:', err);
+        res.status(500).send(`Radio connection failed: ${err.message}`);
+    });
 }
