@@ -138,7 +138,7 @@ function RadioApp() {
       } catch (e) { }
     }
 
-    console.log("🛠️ Re-conectando con Ultra-Watchdog...");
+    console.log("🛠️ Re-conectando (V13-CALM)...");
     const newAudio = new Audio();
     newAudio.volume = latestVolumeRef.current;
     newAudio.crossOrigin = "anonymous";
@@ -160,8 +160,8 @@ function RadioApp() {
     });
 
     newAudio.addEventListener('error', (e) => {
-      console.error("❌ Error de audio, re-intentando...");
-      if (isPlaying) setTimeout(setupAudio, 1000);
+      console.error("❌ Error de audio (esperando 10s para re-intentar)...");
+      if (isPlaying) setTimeout(setupAudio, 10000); // 10s de calma
     });
 
     audioRef.current = newAudio;
@@ -189,7 +189,7 @@ function RadioApp() {
           sameTimeCount++;
           // Si pasan 5-6 segundos sin avance real, reiniciamos
           if (sameTimeCount >= 2) {
-            console.warn("🚀 Ultra-Watchdog: Detectado silencio, recuperando audio...");
+            console.warn("🚀 Watchdog (V13): Silencio detectado, reiniciando...");
             sameTimeCount = 0;
             setupAudio();
           }
