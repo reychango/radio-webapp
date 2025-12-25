@@ -129,28 +129,37 @@ function RadioApp() {
       audioRef.current.src = "";
       audioRef.current.load();
     }
+
+    // We create a new audio object each time to avoid issues with state transitions
     const newAudio = new Audio();
     newAudio.volume = latestVolumeRef.current;
+    newAudio.crossOrigin = "anonymous"; // Important for CORS even through proxy
 
-    // Transfer listeners
-    newAudio.addEventListener('playing', () => setIsStalled(false));
+    newAudio.addEventListener('playing', () => {
+      console.log("▶️ Reproduciendo audio...");
+      setIsStalled(false);
+    });
     newAudio.addEventListener('waiting', () => setIsStalled(true));
     newAudio.addEventListener('stalled', () => setIsStalled(true));
-    newAudio.addEventListener('error', () => {
-      if (newAudio.error?.code !== 4 && isPlaying) {
-        console.warn("⚠️ Error de audio, re-inicializando...");
-        setTimeout(setupAudio, 2500);
+    newAudio.addEventListener('error', (e) => {
+      console.error("❌ Detalle error audio:", newAudio.error);
+      if (isPlaying) {
+        console.warn("⚠️ Re-inicializando audio en 3s...");
+        setTimeout(setupAudio, 3000);
       }
     });
 
     audioRef.current = newAudio;
+
     if (isPlaying) {
-      // Correct URL construction: encode the inner URL and use & if ? exists
-      const innerUrl = `${STREAM_URL_BASE}?t=${Date.now()}`;
-      newAudio.src = `https://corsproxy.io/?${encodeURIComponent(innerUrl)}`;
-      console.log("🔗 Conectando a:", newAudio.src);
+      // Use the internal proxy defined in vercel.json
+      // The parameter ?t= is appended AFTER the ; for Shoutcast compatibility
+      const proxyUrl = `/radio-stream?t=${Date.now()}`;
+      newAudio.src = proxyUrl;
+
+      console.log("🔗 Conectando a proxy:", proxyUrl);
       newAudio.play().catch(err => {
-        console.error("❌ Error al reproducir:", err);
+        console.error("❌ Error al reproducir audio:", err);
       });
     }
   };
@@ -160,13 +169,14 @@ function RadioApp() {
     let lastTime = -1;
     let progressInterval = setInterval(() => {
       if (isPlaying && isOnline && audioRef.current && !isStalled) {
+        // If the playback time hasn't advanced but it's supposed to be playing, something is wrong
         if (audioRef.current.currentTime === lastTime && !audioRef.current.paused) {
-          console.log("⏱️ Silencio detectado, forzando refresh...");
+          console.log("⏱️ Stream congelado detectado, reiniciando...");
           setupAudio();
         }
         lastTime = audioRef.current.currentTime;
       }
-    }, 15000);
+    }, 10000);
 
     return () => clearInterval(progressInterval);
   }, [isPlaying, isOnline, isStalled]);
