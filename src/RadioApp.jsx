@@ -129,60 +129,48 @@ function RadioApp() {
         audioRef.current.pause();
         audioRef.current.src = "";
         audioRef.current.load();
-        // Clear all listeners by cloning
-        const oldAudio = audioRef.current;
-        const newAudioEl = oldAudio.cloneNode(true);
-        oldAudio.parentNode?.replaceChild(newAudioEl, oldAudio);
+        // Force complete cleanup
+        audioRef.current.onplay = null;
+        audioRef.current.onpause = null;
+        audioRef.current.onerror = null;
+        audioRef.current.onended = null;
       } catch (e) { }
     }
 
+    console.log("🛠️ Re-conectando con Ultra-Watchdog...");
     const newAudio = new Audio();
     newAudio.volume = latestVolumeRef.current;
     newAudio.crossOrigin = "anonymous";
 
     newAudio.addEventListener('playing', () => {
-      console.log("▶️ Stream activo - Reproduciendo");
+      console.log("▶️ Música sonando");
       setIsStalled(false);
     });
 
-    newAudio.addEventListener('waiting', () => {
-      console.log("⏳ Esperando datos (Waiting)...");
-      setIsStalled(true);
-    });
-
+    newAudio.addEventListener('waiting', () => setIsStalled(true));
     newAudio.addEventListener('stalled', () => {
-      console.log("⚠️ Stream estancado (Stalled)...");
-      setIsStalled(true);
-    });
-
-    newAudio.addEventListener('suspend', () => {
-      console.log("⏹️ Carga suspendida");
+      console.warn("⚠️ Stream estancado, forzando salto...");
+      setupAudio();
     });
 
     newAudio.addEventListener('ended', () => {
-      console.warn("🏁 Stream finalizado de forma inesperada. Reiniciando...");
+      console.warn("🏁 Fin de stream, reconectando al instante...");
       setupAudio();
     });
 
     newAudio.addEventListener('error', (e) => {
-      const err = newAudio.error;
-      console.error("❌ Error de audio crítico:", err?.code, err?.message);
-      if (isPlaying) {
-        console.warn("🔄 Re-inicializando en 2s por error...");
-        setTimeout(setupAudio, 2000);
-      }
+      console.error("❌ Error de audio, re-intentando...");
+      if (isPlaying) setTimeout(setupAudio, 1000);
     });
 
     audioRef.current = newAudio;
 
     if (isPlaying) {
-      // Usamos el proxy de Vercel (Edge Function - sin límite de 120s)
-      const proxyUrl = `/api/stream?cache=${Date.now()}`;
+      // Volvemos al proxy estable de vercel.json
+      const proxyUrl = `/radio-stream?v=${Date.now()}`;
       newAudio.src = proxyUrl;
-
-      console.log("🔗 Conectando:", proxyUrl);
-      newAudio.play().catch(err => {
-        console.error("❌ Error de inicio de reproducción:", err);
+      newAudio.play().catch(() => {
+        // Silently retry on next watchdog
       });
     }
   };
@@ -196,13 +184,11 @@ function RadioApp() {
       if (isPlaying && isOnline && audioRef.current) {
         const currentTime = audioRef.current.currentTime;
 
-        // Si el tiempo no avanza, sumamos al contador
         if (currentTime === lastTime && !audioRef.current.paused) {
           sameTimeCount++;
-          console.log(`📊 Watchdog: Stream sin avance (${sameTimeCount}/3)`);
-
-          if (sameTimeCount >= 3) { // 15 segundos reales (5s * 3)
-            console.warn("🚀 Watchdog: Stream congelado. Forzando reconexión inmediata...");
+          // Si pasan 5-6 segundos sin avance real, reiniciamos
+          if (sameTimeCount >= 2) {
+            console.warn("🚀 Ultra-Watchdog: Detectado silencio, recuperando audio...");
             sameTimeCount = 0;
             setupAudio();
           }
@@ -212,7 +198,7 @@ function RadioApp() {
 
         lastTime = currentTime;
       }
-    }, 5000);
+    }, 3000); // Revisión cada 3 segundos para máxima agilidad
 
     return () => clearInterval(progressInterval);
   }, [isPlaying, isOnline, isStalled]);
