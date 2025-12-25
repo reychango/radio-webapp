@@ -131,9 +131,9 @@ function RadioApp() {
 
     setTimeout(() => {
       isConnectingRef.current = false;
-    }, 2000);
+    }, 5000);
 
-    console.log("🛠️ Conectando Puente V24-ESTABLE...");
+    console.log("📻 Conectando Puente VLC (V25-ESTABLE)...");
     if (audioRef.current) {
       try {
         audioRef.current.pause();
