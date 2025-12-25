@@ -138,10 +138,11 @@ function RadioApp() {
       } catch (e) { }
     }
 
-    console.log("🛠️ Re-conectando (V13-CALM)...");
+    console.log("🛠️ Re-conectando (V14-STABLE)...");
     const newAudio = new Audio();
     newAudio.volume = latestVolumeRef.current;
-    newAudio.crossOrigin = "anonymous";
+    // For same-origin proxy, we don't need crossOrigin which can be stricter
+    // newAudio.crossOrigin = "anonymous";
 
     newAudio.addEventListener('playing', () => {
       console.log("▶️ Música sonando");
@@ -189,7 +190,7 @@ function RadioApp() {
           sameTimeCount++;
           // Si pasan 5-6 segundos sin avance real, reiniciamos
           if (sameTimeCount >= 2) {
-            console.warn("🚀 Watchdog (V13): Silencio detectado, reiniciando...");
+            console.warn("🚀 Watchdog (V14): Silencio detectado, reiniciando...");
             sameTimeCount = 0;
             setupAudio();
           }
