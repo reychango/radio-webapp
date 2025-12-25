@@ -4,7 +4,7 @@ import CardPlayer from './components/CardPlayer';
 
 const BASE_URL = "http://uk2freenew.listen2myradio.com:10718";
 const STREAM_URL_BASE = "http://88.150.230.110:10718/stream";
-const PROXY_URL = "/radio-stream"; // Cambiar por la URL de tu Cloudflare Worker (ej: https://tu-worker.workers.dev)
+const PROXY_URL = "https://radioproxy.reychango.workers.dev/";
 const STATS_URL = "/api/metadata";
 
 function RadioApp() {
