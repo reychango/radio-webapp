@@ -199,7 +199,7 @@ function RadioApp() {
 
         lastTime = currentTime;
       }
-    }, 3000); // Revisión cada 3 segundos para máxima agilidad
+    }, 15000); // 15s check
 
     return () => clearInterval(progressInterval);
   }, [isPlaying, isOnline, isStalled]);
