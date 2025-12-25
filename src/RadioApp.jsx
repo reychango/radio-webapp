@@ -12,6 +12,7 @@ function RadioApp() {
   const [volume, setVolume] = useState(0.8);
   const [metadata, setMetadata] = useState({ title: "Sintonizando...", artist: "La Espárrago Rock" });
   const [history, setHistory] = useState([]);
+  const [retryDelay, setRetryDelay] = useState(5000); // 5s inicial
   const [coverUrl, setCoverUrl] = useState("/logo.png");
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -132,7 +133,7 @@ function RadioApp() {
     // Libere el estado después de un breve delay
     setTimeout(() => {
       isConnectingRef.current = false;
-    }, 5000);
+    }, 2000);
 
     if (audioRef.current) {
       try {
@@ -153,25 +154,22 @@ function RadioApp() {
     // For same-origin proxy, we don't need crossOrigin which can be stricter
     // newAudio.crossOrigin = "anonymous";
 
-    newAudio.addEventListener('playing', () => {
-      console.log("▶️ Música sonando");
-      setIsStalled(false);
-    });
-
-    newAudio.addEventListener('waiting', () => setIsStalled(true));
-    newAudio.addEventListener('stalled', () => {
-      console.warn("⚠️ Stream buffering...");
-      // NO reiniciamos el audio aquí, dejamos que el navegador gestione su buffer
+    newAudio.addEventListener('error', (e) => {
+      console.error(`❌ Error de audio. Re-intentando en ${retryDelay / 1000}s...`);
+      // Backoff exponencial: doblamos el tiempo hasta un máximo de 2 min
+      setRetryDelay(prev => Math.min(prev * 2, 120000));
+      if (isPlaying) setTimeout(setupAudio, retryDelay);
     });
 
     newAudio.addEventListener('ended', () => {
-      console.warn("🏁 Stream finalizado, re-intentando en 5s...");
-      setTimeout(setupAudio, 5000);
+      console.warn("🏁 Stream finalizado. Intentando recuperar...");
+      if (isPlaying) setTimeout(setupAudio, retryDelay);
     });
 
-    newAudio.addEventListener('error', (e) => {
-      console.error("❌ Error de audio (esperando 10s para re-intentar)...");
-      if (isPlaying) setTimeout(setupAudio, 10000); // 10s de calma
+    newAudio.addEventListener('playing', () => {
+      console.log("▶️ Música sonando");
+      setIsStalled(false);
+      setRetryDelay(5000); // Reset del backoff al tener éxito
     });
 
     audioRef.current = newAudio;
@@ -187,32 +185,7 @@ function RadioApp() {
   };
 
   // Lifecycle
-  useEffect(() => {
-    let lastTime = -1;
-    let sameTimeCount = 0;
-
-    let progressInterval = setInterval(() => {
-      if (isPlaying && isOnline && audioRef.current) {
-        const currentTime = audioRef.current.currentTime;
-
-        if (currentTime === lastTime && !audioRef.current.paused) {
-          sameTimeCount++;
-          // Si pasan 5-6 segundos sin avance real, reiniciamos
-          if (sameTimeCount >= 2) {
-            console.warn("🚀 Watchdog (V20): Silencio absoluto, reconectando...");
-            sameTimeCount = 0;
-            setupAudio();
-          }
-        } else {
-          sameTimeCount = 0;
-        }
-
-        lastTime = currentTime;
-      }
-    }, 45000); // 45s para estabilidad total
-
-    return () => clearInterval(progressInterval);
-  }, [isPlaying, isOnline, isStalled]);
+  // No Watchdog in V21
 
   // Playback Control
   useEffect(() => {
