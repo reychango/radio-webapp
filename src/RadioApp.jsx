@@ -12,8 +12,6 @@ function RadioApp() {
   const [volume, setVolume] = useState(0.8);
   const [metadata, setMetadata] = useState({ title: "Sintonizando...", artist: "La Espárrago Rock" });
   const [history, setHistory] = useState([]);
-  const [retryDelay, setRetryDelay] = useState(10000); // 10s inicial
-  const [errorCount, setErrorCount] = useState(0);
   const [coverUrl, setCoverUrl] = useState("/logo.png");
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -131,12 +129,11 @@ function RadioApp() {
     if (isConnectingRef.current) return;
     isConnectingRef.current = true;
 
-    // Libere el estado después de un breve delay
     setTimeout(() => {
       isConnectingRef.current = false;
-    }, 10000); // 10s throttle mínimo entre intentos
+    }, 2000);
 
-    console.log(`🛡️ Guardián (V22) [Intento #${errorCount + 1}, Espera: ${retryDelay / 1000}s]...`);
+    console.log("🛠️ Conectando Puente V24-ESTABLE...");
     if (audioRef.current) {
       try {
         audioRef.current.pause();
@@ -156,30 +153,18 @@ function RadioApp() {
     // newAudio.crossOrigin = "anonymous";
 
     newAudio.addEventListener('error', (e) => {
-      setErrorCount(prev => prev + 1);
-      const nextDelay = Math.min(retryDelay * 2, 300000); // Max 5 min
-      setRetryDelay(nextDelay);
-
-      console.error(`❌ Error #${errorCount + 1}. Próximo intento en ${nextDelay / 1000}s...`);
-
-      if (isPlaying && errorCount < 5) {
-        setTimeout(setupAudio, retryDelay);
-      } else if (errorCount >= 5) {
-        console.warn("🛑 Demasiados errores. Deteniendo auto-reconexión para proteger el servidor.");
-        setIsPlaying(false);
-      }
+      console.error("❌ Error de audio. Recuperando en 5s...");
+      if (isPlaying) setTimeout(setupAudio, 5000);
     });
 
     newAudio.addEventListener('ended', () => {
-      console.warn("🏁 Conexión cerrada por el servidor.");
-      // NO re-intentamos automáticamente aquí para evitar el bucle infinito
+      console.warn("🏁 Stream finalizado por el servidor. Reconectando...");
+      if (isPlaying) setTimeout(setupAudio, 5000);
     });
 
     newAudio.addEventListener('playing', () => {
-      console.log("▶️ Conexión Establecida");
+      console.log("▶️ Música sonando");
       setIsStalled(false);
-      setRetryDelay(10000);
-      setErrorCount(0); // Reset total al tener éxito
     });
 
     audioRef.current = newAudio;
