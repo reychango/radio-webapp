@@ -3,14 +3,16 @@ export const config = {
 };
 
 export default async function handler(req) {
-    const streamUrl = "http://88.150.230.110:10718/stream";
+    // Usamos el dominio y el punto y coma (;) para máxima compatibilidad
+    const streamUrl = "http://uk2freenew.listen2myradio.com:10718/stream";
 
     try {
         const response = await fetch(streamUrl, {
             method: 'GET',
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': '*/*',
+                'Accept': 'audio/mpeg, */*',
+                'Icy-MetaData': '0' // Pedimos al servidor que NO envíe metadatos en el chorro de audio
             }
         });
 
@@ -21,18 +23,15 @@ export default async function handler(req) {
             });
         }
 
-        // Usamos TransformStream para asegurar un flujo constante sin buffering en Vercel
-        const { readable, writable } = new TransformStream();
-        response.body.pipeTo(writable);
-
-        return new Response(readable, {
+        // Devolvemos el body directamente
+        return new Response(response.body, {
             status: 200,
             headers: {
                 "Content-Type": "audio/mpeg",
                 "Access-Control-Allow-Origin": "*",
                 "Cache-Control": "no-cache, no-store, must-revalidate",
                 "Connection": "keep-alive",
-                "X-V15-Status": "Streaming"
+                "X-V16-Status": "Flowing"
             },
         });
     } catch (error) {
