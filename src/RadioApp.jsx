@@ -176,8 +176,8 @@ function RadioApp() {
     audioRef.current = newAudio;
 
     if (isPlaying) {
-      // Usamos el proxy de Vercel (con la IP directa configurada en vercel.json)
-      const proxyUrl = `/radio-stream?cache=${Date.now()}`;
+      // Usamos el proxy de Vercel (Edge Function - sin límite de 120s)
+      const proxyUrl = `/api/stream?cache=${Date.now()}`;
       newAudio.src = proxyUrl;
 
       console.log("🔗 Conectando:", proxyUrl);
