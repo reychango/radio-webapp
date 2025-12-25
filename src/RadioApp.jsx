@@ -125,26 +125,46 @@ function RadioApp() {
 
   const setupAudio = () => {
     if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.src = "";
-      audioRef.current.load();
+      try {
+        audioRef.current.pause();
+        audioRef.current.src = "";
+        audioRef.current.load();
+        audioRef.current.removeEventListener('playing', () => { });
+        audioRef.current.removeEventListener('waiting', () => { });
+        audioRef.current.removeEventListener('stalled', () => { });
+        audioRef.current.removeEventListener('error', () => { });
+        audioRef.current.removeEventListener('ended', () => { });
+      } catch (e) { }
     }
 
-    // We create a new audio object each time to avoid issues with state transitions
     const newAudio = new Audio();
     newAudio.volume = latestVolumeRef.current;
-    newAudio.crossOrigin = "anonymous"; // Important for CORS even through proxy
+    newAudio.crossOrigin = "anonymous";
 
     newAudio.addEventListener('playing', () => {
-      console.log("▶️ Reproduciendo audio...");
+      console.log("▶️ Stream activo - Reproduciendo");
       setIsStalled(false);
     });
-    newAudio.addEventListener('waiting', () => setIsStalled(true));
-    newAudio.addEventListener('stalled', () => setIsStalled(true));
+
+    newAudio.addEventListener('waiting', () => {
+      console.log("⏳ Esperando datos (Waiting)...");
+      setIsStalled(true);
+    });
+
+    newAudio.addEventListener('stalled', () => {
+      console.log("⚠️ Stream estancado (Stalled)...");
+      setIsStalled(true);
+    });
+
+    newAudio.addEventListener('ended', () => {
+      console.warn("🏁 Stream finalizado de forma inesperada. Reiniciando...");
+      setupAudio();
+    });
+
     newAudio.addEventListener('error', (e) => {
-      console.error("❌ Detalle error audio:", newAudio.error);
+      console.error("❌ Error de audio crítico:", newAudio.error);
       if (isPlaying) {
-        console.warn("⚠️ Re-inicializando audio en 3s...");
+        console.warn("🔄 Re-inicializando en 3s por error...");
         setTimeout(setupAudio, 3000);
       }
     });
@@ -152,14 +172,13 @@ function RadioApp() {
     audioRef.current = newAudio;
 
     if (isPlaying) {
-      // Use the internal proxy defined in vercel.json
-      // The parameter ?t= is appended AFTER the ; for Shoutcast compatibility
+      // Usamos el proxy de Vercel (más estable que los gratuitos externos)
       const proxyUrl = `/radio-stream?t=${Date.now()}`;
       newAudio.src = proxyUrl;
 
-      console.log("🔗 Conectando a proxy:", proxyUrl);
+      console.log("🔗 Conectando:", proxyUrl);
       newAudio.play().catch(err => {
-        console.error("❌ Error al reproducir audio:", err);
+        console.error("❌ Error de inicio de reproducción:", err);
       });
     }
   };
@@ -167,14 +186,27 @@ function RadioApp() {
   // Lifecycle
   useEffect(() => {
     let lastTime = -1;
+    let sameTimeCount = 0;
+
     let progressInterval = setInterval(() => {
-      if (isPlaying && isOnline && audioRef.current && !isStalled) {
-        // If the playback time hasn't advanced but it's supposed to be playing, something is wrong
-        if (audioRef.current.currentTime === lastTime && !audioRef.current.paused) {
-          console.log("⏱️ Stream congelado detectado, reiniciando...");
-          setupAudio();
+      if (isPlaying && isOnline && audioRef.current) {
+        const currentTime = audioRef.current.currentTime;
+
+        // Log detallado para diagnóstico si hay silencio
+        if (currentTime === lastTime && !audioRef.current.paused) {
+          sameTimeCount++;
+          console.log(`📊 Watchdog: Stream sin avance (${sameTimeCount}/2). stalled=${isStalled}`);
+
+          if (sameTimeCount >= 2) { // 20 segundos sin avance real
+            console.log("⏱️ Watchdog: Stream congelado CRÍTICO. Forzando reconexión...");
+            sameTimeCount = 0;
+            setupAudio();
+          }
+        } else {
+          sameTimeCount = 0;
         }
-        lastTime = audioRef.current.currentTime;
+
+        lastTime = currentTime;
       }
     }, 10000);
 
