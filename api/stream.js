@@ -3,17 +3,8 @@ export const config = {
 };
 
 export default async function handler(req) {
-    const streamUrl = "http://uk2freenew.listen2myradio.com:10718/stream";
-
-    if (req.method === "OPTIONS") {
-        return new Response(null, {
-            headers: {
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, OPTIONS",
-                "Access-Control-Allow-Headers": "*"
-            }
-        });
-    }
+    // Usamos el dominio y el punto y coma (;) que es lo más estable
+    const streamUrl = "http://uk2freenew.listen2myradio.com:10718/;";
 
     try {
         const response = await fetch(streamUrl, {
@@ -26,10 +17,13 @@ export default async function handler(req) {
         });
 
         if (!response.ok) {
-            return new Response(`Radio Error ${response.status}`, { status: 502, headers: { "Access-Control-Allow-Origin": "*" } });
+            return new Response(`Radio Server Status: ${response.status}`, {
+                status: 502,
+                headers: { "Access-Control-Allow-Origin": "*" }
+            });
         }
 
-        // Retornamos una respuesta LIMPIA, sin cabeceras basurilla del servidor Shoutcast
+        // Retornamos una respuesta con cabeceras que obligan a mantener la conexión
         return new Response(response.body, {
             status: 200,
             headers: {
@@ -37,8 +31,7 @@ export default async function handler(req) {
                 "Access-Control-Allow-Origin": "*",
                 "Cache-Control": "no-cache, no-store, must-revalidate",
                 "Connection": "keep-alive",
-                "Pragma": "no-cache",
-                "X-V17-Version": "Ultimate"
+                "X-V18-Status": "Natural-Flow"
             },
         });
     } catch (error) {

@@ -138,7 +138,7 @@ function RadioApp() {
       } catch (e) { }
     }
 
-    console.log("🛠️ Re-conectando (V17-ULTIMATE)...");
+    console.log("🛠️ Re-conectando (V18-NATURAL)...");
     const newAudio = new Audio();
     newAudio.volume = latestVolumeRef.current;
     // For same-origin proxy, we don't need crossOrigin which can be stricter
@@ -151,13 +151,13 @@ function RadioApp() {
 
     newAudio.addEventListener('waiting', () => setIsStalled(true));
     newAudio.addEventListener('stalled', () => {
-      console.warn("⚠️ Stream estancado, forzando salto...");
-      setupAudio();
+      console.warn("⚠️ Stream buffering...");
+      // NO reiniciamos el audio aquí, dejamos que el navegador gestione su buffer
     });
 
     newAudio.addEventListener('ended', () => {
-      console.warn("🏁 Fin de stream, reconectando al instante...");
-      setupAudio();
+      console.warn("🏁 Stream finalizado, re-intentando en 5s...");
+      setTimeout(setupAudio, 5000);
     });
 
     newAudio.addEventListener('error', (e) => {
@@ -190,7 +190,7 @@ function RadioApp() {
           sameTimeCount++;
           // Si pasan 5-6 segundos sin avance real, reiniciamos
           if (sameTimeCount >= 2) {
-            console.warn("🚀 Watchdog (V17): Silencio prolongado, reconectando...");
+            console.warn("🚀 Watchdog (V18): Silencio total, reiniciando flujo...");
             sameTimeCount = 0;
             setupAudio();
           }
@@ -200,7 +200,7 @@ function RadioApp() {
 
         lastTime = currentTime;
       }
-    }, 20000); // 20s para dejar que el buffer se llene
+    }, 40000); // 40s para dar estabilidad absoluta al buffer
 
     return () => clearInterval(progressInterval);
   }, [isPlaying, isOnline, isStalled]);
