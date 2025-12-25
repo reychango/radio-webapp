@@ -4,7 +4,7 @@ import CardPlayer from './components/CardPlayer';
 
 const BASE_URL = "http://uk2freenew.listen2myradio.com:10718";
 const STREAM_URL_BASE = "http://88.150.230.110:10718/stream";
-const PROXY_URL = "/api/stream";
+const PROXY_URL = "/api/radio-stream";
 const STATS_URL = "/api/metadata";
 
 function RadioApp() {
@@ -21,6 +21,7 @@ function RadioApp() {
   const latestMetadataRef = useRef(metadata);
   const latestCoverRef = useRef(coverUrl);
   const latestVolumeRef = useRef(volume);
+  const isConnectingRef = useRef(false);
 
   // Initialize audio on mount
   useEffect(() => {
@@ -125,6 +126,14 @@ function RadioApp() {
   }, [isOnline]);
 
   const setupAudio = () => {
+    if (isConnectingRef.current) return;
+    isConnectingRef.current = true;
+
+    // Libere el estado después de un breve delay
+    setTimeout(() => {
+      isConnectingRef.current = false;
+    }, 5000);
+
     if (audioRef.current) {
       try {
         audioRef.current.pause();
@@ -138,7 +147,7 @@ function RadioApp() {
       } catch (e) { }
     }
 
-    console.log("🛠️ Re-conectando (V19-SAVIOR)...");
+    console.log("🛠️ Re-conectando (V20-TRINITY)...");
     const newAudio = new Audio();
     newAudio.volume = latestVolumeRef.current;
     // For same-origin proxy, we don't need crossOrigin which can be stricter
@@ -168,8 +177,8 @@ function RadioApp() {
     audioRef.current = newAudio;
 
     if (isPlaying) {
-      // Usamos el proxy (Vercel o Cloudflare Worker)
-      const proxyUrl = `${PROXY_URL}?v=${Date.now()}`;
+      // Usamos el proxy sin parámetros de timestamp que pueden marear algunos proxies
+      const proxyUrl = PROXY_URL;
       newAudio.src = proxyUrl;
       newAudio.play().catch(() => {
         // Silently retry on next watchdog
@@ -190,7 +199,7 @@ function RadioApp() {
           sameTimeCount++;
           // Si pasan 5-6 segundos sin avance real, reiniciamos
           if (sameTimeCount >= 2) {
-            console.warn("🚀 Watchdog (V19): Silencio total, reiniciando flujo...");
+            console.warn("🚀 Watchdog (V20): Silencio absoluto, reconectando...");
             sameTimeCount = 0;
             setupAudio();
           }
@@ -200,7 +209,7 @@ function RadioApp() {
 
         lastTime = currentTime;
       }
-    }, 40000); // 40s para dar estabilidad absoluta al buffer
+    }, 45000); // 45s para estabilidad total
 
     return () => clearInterval(progressInterval);
   }, [isPlaying, isOnline, isStalled]);
