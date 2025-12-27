@@ -131,15 +131,13 @@ function RadioApp() {
 
     setTimeout(() => {
       isConnectingRef.current = false;
-    }, 5000);
+    }, 2000);
 
-    console.log("♾️ Conectando Puente Regenerador V26...");
+    console.log("🛡️ Conectando Puente V27-ESTABLE...");
     if (audioRef.current) {
       try {
         audioRef.current.pause();
-        audioRef.current.src = "";
-        audioRef.current.load();
-        // Force complete cleanup
+        // NO poner src="" para evitar "Invalid URL", simplemente pausar y limpiar
         audioRef.current.onplay = null;
         audioRef.current.onpause = null;
         audioRef.current.onerror = null;
@@ -153,17 +151,17 @@ function RadioApp() {
     // newAudio.crossOrigin = "anonymous";
 
     newAudio.addEventListener('error', (e) => {
-      console.error("❌ Error en conexión infinita. Re-intentando en 10s...");
-      if (isPlaying) setTimeout(setupAudio, 10000);
+      console.error("❌ Error de audio. Recuperando en 5s...");
+      if (isPlaying) setTimeout(setupAudio, 5000);
     });
 
     newAudio.addEventListener('ended', () => {
-      console.warn("🏁 El canal infinito se ha cerrado. Re-abriendo...");
+      console.warn("🏁 Conexión finalizada. Reconectando...");
       if (isPlaying) setTimeout(setupAudio, 5000);
     });
 
     newAudio.addEventListener('playing', () => {
-      console.log("▶️ Música regenerada sonando");
+      console.log("▶️ Música sonando (V27)");
       setIsStalled(false);
     });
 
