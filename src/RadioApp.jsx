@@ -133,7 +133,7 @@ function RadioApp() {
       isConnectingRef.current = false;
     }, 2000);
 
-    console.log("🛡️ Conectando Puente V27-ESTABLE...");
+    console.log("🕵️ Conectando Puente V28-STEALTH...");
     if (audioRef.current) {
       try {
         audioRef.current.pause();

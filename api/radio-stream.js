@@ -3,7 +3,6 @@ export const config = {
 };
 
 export default async function handler(req) {
-    // V27-BATTLE-READY: Simplicidad total para evitar 502/504
     const streamUrl = "http://88.150.230.110:10718/stream";
 
     try {
@@ -13,14 +12,15 @@ export default async function handler(req) {
                 'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18',
                 'Accept': '*/*',
                 'Connection': 'keep-alive',
-                'Icy-MetaData': '0'
+                'Icy-MetaData': '0',
+                'Referer': 'http://uk2freenew.listen2myradio.com/',
+                'Origin': 'http://uk2freenew.listen2myradio.com/'
             },
-            // Duplex es necesario para flujos largos
             duplex: 'half'
         });
 
         if (!response.ok) {
-            return new Response(`Radio Bridge Error: ${response.status}`, {
+            return new Response(`Bridge Blocked: ${response.status}`, {
                 status: 502,
                 headers: { "Access-Control-Allow-Origin": "*" }
             });
@@ -33,11 +33,11 @@ export default async function handler(req) {
                 "Access-Control-Allow-Origin": "*",
                 "Cache-Control": "no-cache, no-store, must-revalidate",
                 "Connection": "keep-alive",
-                "X-V27-Status": "Battle-Ready"
+                "X-V28-Status": "Stealth-Mode"
             },
         });
     } catch (error) {
-        return new Response(`Bridge Fault: ${error.message}`, {
+        return new Response(`Network Fault: ${error.message}`, {
             status: 500,
             headers: { "Access-Control-Allow-Origin": "*" },
         });

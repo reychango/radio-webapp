@@ -1,11 +1,9 @@
 export const config = { runtime: 'edge' };
 
 export default async function handler(req) {
-    const testUrl = "http://88.150.230.110:10718/stats?sid=1&json=1";
     try {
-        const res = await fetch(testUrl);
-        const data = await res.json();
-        return new Response(JSON.stringify({ success: true, data }), {
+        const res = await fetch("https://www.google.com");
+        return new Response(JSON.stringify({ success: true, status: res.status }), {
             headers: { "Content-Type": "application/json" }
         });
     } catch (err) {
