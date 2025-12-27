@@ -6,6 +6,7 @@ const BASE_URL = "http://uk2freenew.listen2myradio.com:10718";
 const STREAM_URL_BASE = "http://88.150.230.110:10718/stream";
 const PROXY_URL = "/api/radio-stream";
 const STATS_URL = "/api/metadata";
+const LEGENDARY_URL = "https://uk2freenew.listen2myradio.com/live.mp3?typeportmount=s2_10718_stream_78";
 
 function RadioApp() {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -133,7 +134,7 @@ function RadioApp() {
       isConnectingRef.current = false;
     }, 2000);
 
-    console.log("🚀 Lanzando Rescate V29-SERVERLESS...");
+    console.log("🏆 Lanzando SOLUCIÓN DEFINITIVA V30-LEGENDARY...");
     if (audioRef.current) {
       try {
         audioRef.current.pause();
@@ -169,8 +170,8 @@ function RadioApp() {
 
     if (isPlaying) {
       // Usamos el proxy sin parámetros de timestamp que pueden marear algunos proxies
-      const proxyUrl = PROXY_URL;
-      newAudio.src = proxyUrl;
+      const audioSrc = LEGENDARY_URL;
+      newAudio.src = audioSrc;
       newAudio.play().catch(() => {
         // Silently retry on next watchdog
       });
