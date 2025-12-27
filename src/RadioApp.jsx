@@ -134,7 +134,7 @@ function RadioApp() {
       isConnectingRef.current = false;
     }, 2000);
 
-    console.log("🏆 Lanzando SOLUCIÓN DEFINITIVA V30-LEGENDARY...");
+    console.log("🏆 Sintonía Legendaria V31-PLUS (Audio + Metadatos)...");
     if (audioRef.current) {
       try {
         audioRef.current.pause();
