@@ -7,6 +7,7 @@ const STREAM_URL_BASE = "http://88.150.230.110:10718/stream";
 const PROXY_URL = "/api/radio-stream";
 const STATS_URL = "/api/metadata";
 const LEGENDARY_URL = "https://uk2freenew.listen2myradio.com/live.mp3?typeportmount=s2_10718_stream_78";
+const CODETABS_METADATA_URL = "https://api.codetabs.com/v1/proxy?quest=http://88.150.230.110:10718/7.html";
 
 function RadioApp() {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -89,13 +90,18 @@ function RadioApp() {
 
       try {
         const timeoutId = setTimeout(() => controller.abort(), 8000);
-        // We use our local API which is much more reliable
-        const res = await fetch(`${STATS_URL}?t=${Date.now()}`, { signal: controller.signal });
+        // V33: Usamos Codetabs como proxy externo que no está bloqueado
+        const res = await fetch(`${CODETABS_METADATA_URL}&t=${Date.now()}`, { signal: controller.signal });
         clearTimeout(timeoutId);
 
         if (res && res.ok) {
-          const data = await res.json();
-          const songTitle = data?.songtitle;
+          const html = await res.text();
+          // Extraer contenido entre <body> y </body>
+          const bodyMatch = html.match(/<body>(.*)<\/body>/i);
+          const rawData = bodyMatch ? bodyMatch[1] : html;
+          // El formato es: 2,1,282,10000,1,128,Artista - Cancion
+          const parts = rawData.split(',');
+          const songTitle = parts.length >= 7 ? parts.slice(6).join(',') : "La Espárrago Rock";
           if (songTitle) {
             const raw = songTitle || "";
             const parts = raw.split(' - ');
@@ -134,7 +140,7 @@ function RadioApp() {
       isConnectingRef.current = false;
     }, 2000);
 
-    console.log("🕵️ Lanzando V32-GHOST-METADATA (Rescate Legado)...");
+    console.log("🎯 Lanzando V33-FINAL (Codetabs Metadata)...");
     if (audioRef.current) {
       try {
         audioRef.current.pause();
@@ -162,7 +168,7 @@ function RadioApp() {
     });
 
     newAudio.addEventListener('playing', () => {
-      console.log("▶️ Música sonando (V32-LEGENDARY)");
+      console.log("▶️ Música sonando (V33-FINAL)");
       setIsStalled(false);
     });
 
