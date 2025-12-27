@@ -134,7 +134,7 @@ function RadioApp() {
       isConnectingRef.current = false;
     }, 2000);
 
-    console.log("🏆 Sintonía Legendaria V31-PLUS (Audio + Metadatos)...");
+    console.log("🕵️ Lanzando V32-GHOST-METADATA (Rescate Legado)...");
     if (audioRef.current) {
       try {
         audioRef.current.pause();
@@ -162,7 +162,7 @@ function RadioApp() {
     });
 
     newAudio.addEventListener('playing', () => {
-      console.log("▶️ Música sonando (V27)");
+      console.log("▶️ Música sonando (V32-LEGENDARY)");
       setIsStalled(false);
     });
 
