@@ -133,7 +133,7 @@ function RadioApp() {
       isConnectingRef.current = false;
     }, 5000);
 
-    console.log("📻 Conectando Puente VLC (V25-ESTABLE)...");
+    console.log("♾️ Conectando Puente Regenerador V26...");
     if (audioRef.current) {
       try {
         audioRef.current.pause();
@@ -153,17 +153,17 @@ function RadioApp() {
     // newAudio.crossOrigin = "anonymous";
 
     newAudio.addEventListener('error', (e) => {
-      console.error("❌ Error de audio. Re-intentando silenciosamente en 15s...");
-      if (isPlaying) setTimeout(setupAudio, 15000);
+      console.error("❌ Error en conexión infinita. Re-intentando en 10s...");
+      if (isPlaying) setTimeout(setupAudio, 10000);
     });
 
     newAudio.addEventListener('ended', () => {
-      console.warn("🏁 Conexión finalizada. Recuperando en 15s...");
-      if (isPlaying) setTimeout(setupAudio, 15000);
+      console.warn("🏁 El canal infinito se ha cerrado. Re-abriendo...");
+      if (isPlaying) setTimeout(setupAudio, 5000);
     });
 
     newAudio.addEventListener('playing', () => {
-      console.log("▶️ Música sonando");
+      console.log("▶️ Música regenerada sonando");
       setIsStalled(false);
     });
 
