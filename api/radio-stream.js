@@ -1,45 +1,49 @@
-export const config = {
-    runtime: 'edge',
-};
+const http = require('http');
 
-export default async function handler(req) {
-    const streamUrl = "http://88.150.230.110:10718/stream";
+export default function handler(req, res) {
+    // V29-SERVERLESS-RESCUE: Usando el stack de Node.js puro (no Edge)
+    const streamUrl = "http://88.150.230.110:10718/;"; // Formato clásico Shoutcast
 
-    try {
-        const response = await fetch(streamUrl, {
-            method: 'GET',
-            headers: {
-                'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18',
-                'Accept': '*/*',
-                'Connection': 'keep-alive',
-                'Icy-MetaData': '0',
-                'Referer': 'http://uk2freenew.listen2myradio.com/',
-                'Origin': 'http://uk2freenew.listen2myradio.com/'
-            },
-            duplex: 'half'
-        });
+    // CORS
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Content-Type', 'audio/mpeg');
+    res.setHeader('Connection', 'keep-alive');
 
-        if (!response.ok) {
-            return new Response(`Bridge Blocked: ${response.status}`, {
-                status: 502,
-                headers: { "Access-Control-Allow-Origin": "*" }
-            });
+    const proxyRequest = http.request(streamUrl, {
+        method: 'GET',
+        headers: {
+            'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18',
+            'Accept': '*/*',
+            'Icy-MetaData': '0',
+            'Referer': 'http://uk2freenew.listen2myradio.com/',
+            'Origin': 'http://uk2freenew.listen2myradio.com/'
         }
+    }, (proxyResponse) => {
+        // Enviar cabeceras de éxito
+        res.writeHead(200, {
+            'Content-Type': 'audio/mpeg',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'Transfer-Encoding': 'chunked'
+        });
 
-        return new Response(response.body, {
-            status: 200,
-            headers: {
-                "Content-Type": "audio/mpeg",
-                "Access-Control-Allow-Origin": "*",
-                "Cache-Control": "no-cache, no-store, must-revalidate",
-                "Connection": "keep-alive",
-                "X-V28-Status": "Stealth-Mode"
-            },
-        });
-    } catch (error) {
-        return new Response(`Network Fault: ${error.message}`, {
-            status: 500,
-            headers: { "Access-Control-Allow-Origin": "*" },
-        });
-    }
+        // Pipe directo de la respuesta
+        proxyResponse.pipe(res);
+    });
+
+    proxyRequest.on('error', (e) => {
+        console.error("V29 Proxy Error:", e.message);
+        if (!res.headersSent) {
+            res.status(500).send("Bridge Fault: " + e.message);
+        }
+    });
+
+    // Handle client disconnect
+    req.on('close', () => {
+        proxyRequest.destroy();
+    });
+
+    proxyRequest.end();
 }
