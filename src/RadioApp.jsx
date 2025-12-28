@@ -132,7 +132,7 @@ function RadioApp() {
     };
   }, [isOnline]);
 
-  const setupAudio = async () => {
+  const setupAudio = () => {
     if (isConnectingRef.current) return;
     isConnectingRef.current = true;
 
@@ -140,25 +140,12 @@ function RadioApp() {
       isConnectingRef.current = false;
     }, 2000);
 
-    console.log("🎯 Lanzando V34-DYNAMIC (URL Dinámica)...");
+    console.log("🎯 Lanzando V35-PROXY-DIRECT...");
 
-    // 1. Obtener la URL dinámica actual del servidor
-    let streamUrl = LEGENDARY_URL; // Fallback
-    try {
-      const res = await fetch("/api/stream-url", { signal: AbortSignal.timeout(5000) });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.streamUrl) {
-          streamUrl = data.streamUrl;
-          console.log("🔗 URL Dinámica obtenida:", streamUrl);
-        } else if (data.fallback) {
-          streamUrl = data.fallback;
-          console.log("🔄 Usando fallback proxy:", streamUrl);
-        }
-      }
-    } catch (e) {
-      console.warn("⚠️ No se pudo obtener URL dinámica, usando fallback");
-    }
+    // V35: Usamos el proxy de Vercel directamente
+    const streamUrl = PROXY_URL + "?t=" + Date.now();
+    console.log("🔗 Conectando a proxy:", streamUrl);
+
 
     if (audioRef.current) {
       try {
@@ -184,7 +171,7 @@ function RadioApp() {
     });
 
     newAudio.addEventListener('playing', () => {
-      console.log("▶️ Música sonando (V34-DYNAMIC)");
+      console.log("▶️ Música sonando (V35-PROXY-DIRECT)");
       setIsStalled(false);
     });
 
