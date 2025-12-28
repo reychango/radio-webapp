@@ -132,7 +132,7 @@ function RadioApp() {
     };
   }, [isOnline]);
 
-  const setupAudio = () => {
+  const setupAudio = async () => {
     if (isConnectingRef.current) return;
     isConnectingRef.current = true;
 
@@ -140,11 +140,29 @@ function RadioApp() {
       isConnectingRef.current = false;
     }, 2000);
 
-    console.log("🎯 Lanzando V33-FINAL (Codetabs Metadata)...");
+    console.log("🎯 Lanzando V34-DYNAMIC (URL Dinámica)...");
+
+    // 1. Obtener la URL dinámica actual del servidor
+    let streamUrl = LEGENDARY_URL; // Fallback
+    try {
+      const res = await fetch("/api/stream-url", { signal: AbortSignal.timeout(5000) });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.streamUrl) {
+          streamUrl = data.streamUrl;
+          console.log("🔗 URL Dinámica obtenida:", streamUrl);
+        } else if (data.fallback) {
+          streamUrl = data.fallback;
+          console.log("🔄 Usando fallback proxy:", streamUrl);
+        }
+      }
+    } catch (e) {
+      console.warn("⚠️ No se pudo obtener URL dinámica, usando fallback");
+    }
+
     if (audioRef.current) {
       try {
         audioRef.current.pause();
-        // NO poner src="" para evitar "Invalid URL", simplemente pausar y limpiar
         audioRef.current.onplay = null;
         audioRef.current.onpause = null;
         audioRef.current.onerror = null;
@@ -154,8 +172,6 @@ function RadioApp() {
 
     const newAudio = new Audio();
     newAudio.volume = latestVolumeRef.current;
-    // For same-origin proxy, we don't need crossOrigin which can be stricter
-    // newAudio.crossOrigin = "anonymous";
 
     newAudio.addEventListener('error', (e) => {
       console.error("❌ Error de audio. Recuperando en 5s...");
@@ -168,16 +184,14 @@ function RadioApp() {
     });
 
     newAudio.addEventListener('playing', () => {
-      console.log("▶️ Música sonando (V33-FINAL)");
+      console.log("▶️ Música sonando (V34-DYNAMIC)");
       setIsStalled(false);
     });
 
     audioRef.current = newAudio;
 
     if (isPlaying) {
-      // Usamos el proxy sin parámetros de timestamp que pueden marear algunos proxies
-      const audioSrc = LEGENDARY_URL;
-      newAudio.src = audioSrc;
+      newAudio.src = streamUrl;
       newAudio.play().catch(() => {
         // Silently retry on next watchdog
       });
